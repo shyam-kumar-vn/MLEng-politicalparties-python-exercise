@@ -160,20 +160,41 @@ with mlflow.start_run(run_name=run_name):
     
     # Create a custom model with preprocessing components
     class PoliticalPartyClassifier(mlflow.pyfunc.PythonModel):
-        def __init__(self, model, vectorizer, label_encoder):
+        def __init__(self, model, vectorizer, label_encoder, data_loader=None):
             self.model = model
             self.vectorizer = vectorizer
             self.label_encoder = label_encoder
-            # Create a DataLoader instance for text cleaning
-            self.data_loader = DataLoader()
+            # Allow injection of a mock or custom DataLoader for testing
+            self.data_loader = data_loader or DataLoader()
         
         def predict(self, context, model_input):
+            # Handle different input formats
+            import pandas as pd
+            import numpy as np
+            
+            # Convert to pandas DataFrame if needed
+            if isinstance(model_input, dict):
+                model_input = pd.DataFrame(model_input)
+            elif isinstance(model_input, np.ndarray):
+                model_input = pd.DataFrame(model_input, columns=['text'])
+            elif not isinstance(model_input, pd.DataFrame):
+                model_input = pd.DataFrame(model_input)
+            
+            # Get the text column (first column)
+            if 'text' in model_input.columns:
+                text_column = model_input['text']
+            else:
+                text_column = model_input.iloc[:, 0]
+            
             # Clean text using DataLoader's clean_text method
-            cleaned_text = model_input.iloc[:, 0].apply(self.data_loader.clean_text)
+            cleaned_text = text_column.apply(self.data_loader.clean_text)
+            
             # Vectorize
             X = self.vectorizer.transform(cleaned_text)
+            
             # Predict
             predictions = self.model.predict(X)
+            
             # Convert back to original labels
             return self.label_encoder.inverse_transform(predictions)
     
