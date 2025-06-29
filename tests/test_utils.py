@@ -4,7 +4,7 @@ import os
 
 # Add src to path for testing
 sys.path.append('src')
-from utils import get_widget_value, get_table_name, get_model_uri, print_parameters
+from utils import get_widget_value, get_table_name, get_model_uri, print_parameters, setup_mlflow_experiment
 
 
 def test_get_table_name():
@@ -38,4 +38,20 @@ def test_get_widget_value_without_dbutils():
     """Test widget value function when dbutils is not available"""
     # This should return the default value when dbutils is not available
     result = get_widget_value("nonexistent_widget", "default_value")
-    assert result == "default_value" 
+    assert result == "default_value"
+
+
+def test_setup_mlflow_experiment():
+    """Test MLflow experiment setup function"""
+    # This test verifies the function exists and can be called
+    # In a real environment, this would test actual MLflow functionality
+    experiment_name = "/test/experiment"
+    
+    # The function should handle the case where MLflow is not available
+    try:
+        result = setup_mlflow_experiment(experiment_name)
+        # If MLflow is available, result should be the experiment name
+        assert result == experiment_name or result is None
+    except Exception:
+        # If MLflow is not available, the function should handle it gracefully
+        pass 

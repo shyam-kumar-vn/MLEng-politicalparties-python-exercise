@@ -85,6 +85,36 @@ def get_model_uri(catalog_name, schema_name, model_name, version="latest"):
     return f"models:/{catalog_name}.{schema_name}.{model_name}/{version}"
 
 
+def setup_mlflow_experiment(experiment_name):
+    """
+    Safely set up MLflow experiment, creating it if it doesn't exist.
+    
+    Args:
+        experiment_name (str): Name of the experiment to set up
+        
+    Returns:
+        str: The experiment name that was set
+    """
+    try:
+        mlflow.set_experiment(experiment_name)
+        print(f"Using existing experiment: {experiment_name}")
+        return experiment_name
+    except Exception as e:
+        print(f"Experiment {experiment_name} not found. Creating new experiment...")
+        try:
+            # Create the experiment
+            mlflow.create_experiment(experiment_name)
+            mlflow.set_experiment(experiment_name)
+            print(f"Created and set experiment: {experiment_name}")
+            return experiment_name
+        except Exception as create_error:
+            print(f"Failed to create experiment {experiment_name}: {create_error}")
+            print("Using default experiment...")
+            # Fall back to default experiment
+            mlflow.set_experiment(None)
+            return None
+
+
 def print_parameters(params_dict):
     """
     Print parameters in a formatted way.

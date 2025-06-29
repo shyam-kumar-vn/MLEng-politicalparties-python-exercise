@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 
 from src.text_loader.loader import DataLoader
 from src.train_model import train_model
-from src.utils import get_widget_value, get_model_uri, print_parameters
+from src.utils import get_widget_value, get_model_uri, print_parameters, get_table_name, setup_mlflow_experiment
 
 print("All components imported successfully")
 
@@ -35,9 +35,6 @@ print("All components imported successfully")
 # Configure MLflow to use Unity Catalog
 mlflow.set_registry_uri("databricks-uc")
 
-# Get parameters from workflow, with fallback to default values
-from utils import get_widget_value, get_model_uri, print_parameters
-
 # Set the catalog and schema for model registration
 CATALOG_NAME = get_widget_value("catalog_name", "mle_batch_catalog_2025_q2")
 SCHEMA_NAME = get_widget_value("schema_name", "mle_shyamkumar_vn")  # Replace with your name
@@ -45,8 +42,8 @@ MODEL_NAME = get_widget_value("model_name", "political_party_classifier")
 EXPERIMENT_NAME = get_widget_value("experiment_name", "/Shared/mle_shyamkumar_vn_tweet_classification")
 DBFS_BASE_PATH = get_widget_value("dbfs_base_path", "/dbfs/FileStore/shyamkumar.vn")
 
-# Set the experiment name
-mlflow.set_experiment(EXPERIMENT_NAME)
+# Set up MLflow experiment
+setup_mlflow_experiment(EXPERIMENT_NAME)
 
 # Print parameters
 params = {

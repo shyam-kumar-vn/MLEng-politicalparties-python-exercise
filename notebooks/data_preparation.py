@@ -64,10 +64,9 @@ print("DataLoader imported successfully")
 csv_path = f"{DBFS_BASE_PATH}/Tweets.csv"
 loader = DataLoader(filepath=csv_path)
 
-# Load the data
+# Load the data (null tweets are automatically filtered in DataLoader)
 data = loader.data
 
-print(f"Loaded {len(data)} tweets using DataLoader")
 print(f"Data columns: {list(data.columns)}")
 data.head()
 

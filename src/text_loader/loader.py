@@ -12,8 +12,19 @@ class DataLoader:
         self.encoder = None
 
     def load_data(self):
-        """Loads data from a CSV file."""
-        return pd.read_csv(self.filepath)
+        """Loads data from a CSV file and filters out null tweets."""
+        data = pd.read_csv(self.filepath)
+        
+        # Filter out rows where tweet is null
+        initial_count = len(data)
+        data = data.dropna(subset=['Tweet'])
+        filtered_count = len(data)
+        
+        print(f"Loaded {initial_count} tweets from {self.filepath}")
+        print(f"After filtering null tweets: {filtered_count} tweets")
+        print(f"Removed {initial_count - filtered_count} rows with null tweets")
+        
+        return data
 
     @staticmethod
     def remove_characters(text) -> str:

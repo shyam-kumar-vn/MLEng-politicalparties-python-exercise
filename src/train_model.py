@@ -76,6 +76,3 @@ def main():
     print(f"Recall: {metrics['recall']:.4f}")
     print(f"F1 Score: {metrics['f1_score']:.4f}")
     print("Confusion Matrix:\n", metrics['confusion_matrix'])
-
-if __name__ == "__main__":
-    main() 
