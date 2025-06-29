@@ -17,15 +17,21 @@
 
 # DBTITLE 1,Get parameters
 # Get parameters from workflow, with fallback to default values
-CATALOG_NAME = dbutils.widgets.get("catalog_name") if dbutils.widgets.get("catalog_name") else "mle_batch_catalog_2025_q2"
-SCHEMA_NAME = dbutils.widgets.get("schema_name") if dbutils.widgets.get("schema_name") else "mle_shyamkumar_vn"
-MODEL_NAME = dbutils.widgets.get("model_name") if dbutils.widgets.get("model_name") else "political_party_classifier"
-DBFS_BASE_PATH = dbutils.widgets.get("dbfs_base_path") if dbutils.widgets.get("dbfs_base_path") else "/dbfs/FileStore/shyamkumar.vn"
+from src.utils import get_widget_value, get_model_uri, print_parameters, get_table_name
 
-print(f"Catalog: {CATALOG_NAME}")
-print(f"Schema: {SCHEMA_NAME}")
-print(f"Model: {MODEL_NAME}")
-print(f"DBFS Base Path: {DBFS_BASE_PATH}")
+CATALOG_NAME = get_widget_value("catalog_name", "mle_batch_catalog_2025_q2")
+SCHEMA_NAME = get_widget_value("schema_name", "mle_shyamkumar_vn")
+MODEL_NAME = get_widget_value("model_name", "political_party_classifier")
+DBFS_BASE_PATH = get_widget_value("dbfs_base_path", "/dbfs/FileStore/shyamkumar.vn")
+
+# Print parameters
+params = {
+    "Catalog": CATALOG_NAME,
+    "Schema": SCHEMA_NAME,
+    "Model": MODEL_NAME,
+    "DBFS Base Path": DBFS_BASE_PATH
+}
+print_parameters(params)
 
 # COMMAND ----------
 
@@ -42,7 +48,7 @@ import mlflow.pyfunc
 mlflow.set_registry_uri("databricks-uc")
 
 # Load the latest version of the model
-model_uri = f"models:/{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}/latest"
+model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
 loaded_model = mlflow.pyfunc.load_model(model_uri)
 
 print(f"Model loaded from: {model_uri}")
@@ -51,7 +57,7 @@ print(f"Model loaded from: {model_uri}")
 
 # DBTITLE 1,Load test data
 # Load features from Delta table
-features_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.tweet_features"
+features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
 df = spark.read.table(features_table)
 
 # Convert to pandas for evaluation

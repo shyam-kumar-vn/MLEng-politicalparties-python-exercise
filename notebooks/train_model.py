@@ -19,15 +19,13 @@
 import os
 import mlflow
 import mlflow.sklearn
-import sys
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# Add the src directory to Python path
-sys.path.append('/Workspace/Users/shyamkumar.vn@thoughtworks.com/MLEng-politicalparties-python-exercise-fork/src')
-from text_loader.loader import DataLoader
-from train_model import train_model
+from src.text_loader.loader import DataLoader
+from src.train_model import train_model
+from src.utils import get_widget_value, get_model_uri, print_parameters
 
 print("All components imported successfully")
 
@@ -37,20 +35,28 @@ print("All components imported successfully")
 # Configure MLflow to use Unity Catalog
 mlflow.set_registry_uri("databricks-uc")
 
+# Get parameters from workflow, with fallback to default values
+from utils import get_widget_value, get_model_uri, print_parameters
+
 # Set the catalog and schema for model registration
-CATALOG_NAME = "mle_batch_catalog_2025_q2"
-SCHEMA_NAME = "mle_shyamkumar_vn"  # Replace with your name
-MODEL_NAME = "political_party_classifier"
+CATALOG_NAME = get_widget_value("catalog_name", "mle_batch_catalog_2025_q2")
+SCHEMA_NAME = get_widget_value("schema_name", "mle_shyamkumar_vn")  # Replace with your name
+MODEL_NAME = get_widget_value("model_name", "political_party_classifier")
+EXPERIMENT_NAME = get_widget_value("experiment_name", "/Shared/mle_shyamkumar_vn_tweet_classification")
+DBFS_BASE_PATH = get_widget_value("dbfs_base_path", "/dbfs/FileStore/shyamkumar.vn")
 
 # Set the experiment name
-EXPERIMENT_NAME = f"/Shared/mle_shyamkumar_vn_tweet_classification"
 mlflow.set_experiment(EXPERIMENT_NAME)
 
-print(f"MLflow configured for Unity Catalog")
-print(f"Catalog: {CATALOG_NAME}")
-print(f"Schema: {SCHEMA_NAME}")
-print(f"Model: {MODEL_NAME}")
-print(f"Experiment: {EXPERIMENT_NAME}")
+# Print parameters
+params = {
+    "Catalog": CATALOG_NAME,
+    "Schema": SCHEMA_NAME,
+    "Model": MODEL_NAME,
+    "Experiment": EXPERIMENT_NAME,
+    "DBFS Base Path": DBFS_BASE_PATH
+}
+print_parameters(params)
 
 # COMMAND ----------
 
@@ -61,7 +67,7 @@ print(f"Experiment: {EXPERIMENT_NAME}")
 
 # DBTITLE 1,Load data from Delta table using DataLoader
 # Load data from Delta table
-features_table = f"{CATALOG_NAME}.{SCHEMA_NAME}.tweet_features"
+features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
 df = spark.read.table(features_table)
 
 # Convert to pandas
@@ -183,7 +189,7 @@ with mlflow.start_run():
     custom_model = PoliticalPartyClassifier(clf, vectorizer, label_encoder)
     
     # Register model to Unity Catalog
-    model_uri = f"models:/{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}/latest"
+    model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
     
     # Log the model
     mlflow.pyfunc.log_model(
@@ -236,19 +242,3 @@ print("=" * 60)
 # MAGIC - Evaluated with comprehensive metrics
 # MAGIC - Registered to Unity Catalog
 # MAGIC - Ready for inference 
-
-# COMMAND ----------
-
-# DBTITLE 1,Get parameters
-# Get parameters from workflow, with fallback to default values
-CATALOG_NAME = dbutils.widgets.get("catalog_name") if dbutils.widgets.get("catalog_name") else "mle_batch_catalog_2025_q2"
-SCHEMA_NAME = dbutils.widgets.get("schema_name") if dbutils.widgets.get("schema_name") else "mle_shyamkumar_vn"
-MODEL_NAME = dbutils.widgets.get("model_name") if dbutils.widgets.get("model_name") else "political_party_classifier"
-EXPERIMENT_NAME = dbutils.widgets.get("experiment_name") if dbutils.widgets.get("experiment_name") else "/Shared/mle_shyamkumar_vn_tweet_classification"
-DBFS_BASE_PATH = dbutils.widgets.get("dbfs_base_path") if dbutils.widgets.get("dbfs_base_path") else "/dbfs/FileStore/shyamkumar.vn"
-
-print(f"Catalog: {CATALOG_NAME}")
-print(f"Schema: {SCHEMA_NAME}")
-print(f"Model: {MODEL_NAME}")
-print(f"Experiment: {EXPERIMENT_NAME}")
-print(f"DBFS Base Path: {DBFS_BASE_PATH}") 

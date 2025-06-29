@@ -16,15 +16,21 @@
 
 # DBTITLE 1,Get parameters
 # Get parameters from workflow, with fallback to default values
-CATALOG_NAME = dbutils.widgets.get("catalog_name") if dbutils.widgets.get("catalog_name") else "mle_batch_catalog_2025_q2"
-SCHEMA_NAME = dbutils.widgets.get("schema_name") if dbutils.widgets.get("schema_name") else "mle_shyamkumar_vn"
-FEATURES_TABLE = dbutils.widgets.get("features_table") if dbutils.widgets.get("features_table") else "tweet_features"
-DBFS_BASE_PATH = dbutils.widgets.get("dbfs_base_path") if dbutils.widgets.get("dbfs_base_path") else "/dbfs/FileStore/shyamkumar.vn"
+from src.utils import get_widget_value, get_table_name, print_parameters
 
-print(f"Catalog: {CATALOG_NAME}")
-print(f"Schema: {SCHEMA_NAME}")
-print(f"Features Table: {FEATURES_TABLE}")
-print(f"DBFS Base Path: {DBFS_BASE_PATH}")
+CATALOG_NAME = get_widget_value("catalog_name", "mle_batch_catalog_2025_q2")
+SCHEMA_NAME = get_widget_value("schema_name", "mle_shyamkumar_vn")
+FEATURES_TABLE = get_widget_value("features_table", "tweet_features")
+DBFS_BASE_PATH = get_widget_value("dbfs_base_path", "/dbfs/FileStore/shyamkumar.vn")
+
+# Print parameters
+params = {
+    "Catalog": CATALOG_NAME,
+    "Schema": SCHEMA_NAME,
+    "Features Table": FEATURES_TABLE,
+    "DBFS Base Path": DBFS_BASE_PATH
+}
+print_parameters(params)
 
 # COMMAND ----------
 
@@ -45,14 +51,9 @@ print(f"Catalog and schema created/verified: {CATALOG_NAME}.{SCHEMA_NAME}")
 # COMMAND ----------
 
 # DBTITLE 1,Import DataLoader
-import sys
-import os
 import numpy as np
 import pandas as pd
-
-# Add the src directory to Python path
-sys.path.append('/Workspace/Users/shyamkumar.vn@thoughtworks.com/MLEng-politicalparties-python-exercise-fork/src')
-from text_loader.loader import DataLoader
+from src.text_loader.loader import DataLoader
 
 print("DataLoader imported successfully")
 
@@ -130,7 +131,7 @@ print(f"Columns: {list(features_df.columns)}")
 # COMMAND ----------
 
 # DBTITLE 1,Save to Delta table
-features_table_name = f"{CATALOG_NAME}.{SCHEMA_NAME}.{FEATURES_TABLE}"
+features_table_name = get_table_name(CATALOG_NAME, SCHEMA_NAME, FEATURES_TABLE)
 
 # Convert to Spark DataFrame
 spark_features_df = spark.createDataFrame(features_df)
