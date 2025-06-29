@@ -4,7 +4,7 @@ import os
 
 # Add src to path for testing
 sys.path.append('src')
-from utils import get_widget_value, get_table_name, get_model_uri, print_parameters, setup_mlflow_experiment
+from utils import get_widget_value, get_table_name, get_model_uri, print_parameters, setup_mlflow_experiment, create_text_classification_signature
 
 
 def test_get_table_name():
@@ -54,4 +54,22 @@ def test_setup_mlflow_experiment():
         assert result == experiment_name or result is None
     except Exception:
         # If MLflow is not available, the function should handle it gracefully
-        pass 
+        pass
+
+
+def test_create_text_classification_signature():
+    """Test text classification signature creation"""
+    try:
+        signature = create_text_classification_signature()
+        # Verify signature has input and output schemas
+        assert signature.inputs is not None
+        assert signature.outputs is not None
+        # Verify input schema expects text
+        assert len(signature.inputs.input_names()) == 1
+        assert signature.inputs.input_names()[0] == "text"
+        # Verify output schema expects predictions
+        assert len(signature.outputs.input_names()) == 1
+        assert signature.outputs.input_names()[0] == "prediction"
+    except ImportError:
+        # If MLflow is not available, skip this test
+        pass

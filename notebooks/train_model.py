@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 
 from src.text_loader.loader import DataLoader
 from src.train_model import train_model
-from src.utils import get_widget_value, get_model_uri, print_parameters, get_table_name, setup_mlflow_experiment
+from src.utils import get_widget_value, get_model_uri, print_parameters, get_table_name, setup_mlflow_experiment, create_text_classification_signature
 
 print("All components imported successfully")
 
@@ -185,14 +185,18 @@ with mlflow.start_run():
     # Create and log the custom model
     custom_model = PoliticalPartyClassifier(clf, vectorizer, label_encoder)
     
+    # Create model signature for Unity Catalog
+    signature = create_text_classification_signature()
+    
     # Register model to Unity Catalog
     model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
     
-    # Log the model
+    # Log the model with signature
     mlflow.pyfunc.log_model(
         artifact_path="model",
         python_model=custom_model,
-        registered_model_name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}"
+        registered_model_name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}",
+        signature=signature
     )
     
     print(f"Model registered successfully to: {model_uri}")

@@ -85,6 +85,31 @@ def get_model_uri(catalog_name, schema_name, model_name, version="latest"):
     return f"models:/{catalog_name}.{schema_name}.{model_name}/{version}"
 
 
+def create_text_classification_signature():
+    """
+    Create a model signature for text classification models.
+    
+    Returns:
+        ModelSignature: MLflow model signature for text classification
+    """
+    from mlflow.models.signature import ModelSignature
+    from mlflow.types.schema import Schema, TensorSpec
+    import numpy as np
+    
+    # Define input schema (expecting text input)
+    input_schema = Schema([
+        TensorSpec(np.dtype(np.str_), (-1,), "text")
+    ])
+    
+    # Define output schema (expecting string predictions)
+    output_schema = Schema([
+        TensorSpec(np.dtype(np.str_), (-1,), "prediction")
+    ])
+    
+    # Create and return model signature
+    return ModelSignature(inputs=input_schema, outputs=output_schema)
+
+
 def setup_mlflow_experiment(experiment_name):
     """
     Safely set up MLflow experiment, creating it if it doesn't exist.
