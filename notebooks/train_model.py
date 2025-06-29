@@ -22,6 +22,7 @@ import mlflow.sklearn
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from datetime import datetime
 
 from src.text_loader.loader import DataLoader
 from src.train_model import train_model
@@ -86,11 +87,11 @@ print(f"Label distribution: {np.bincount(y)}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Model Training Using Our train_model Function
+# MAGIC ## Model Training and Registration with MLflow and Unity Catalog
 
 # COMMAND ----------
 
-# DBTITLE 1,Split data and train model
+# DBTITLE 1,Split data for training
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
@@ -101,28 +102,33 @@ print(f"Test set size: {X_test.shape[0]}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Train model using our train_model function
-# Use our existing train_model function
-print("Training model using our train_model function...")
-clf, metrics = train_model(X_train, y_train, X_test, y_test)
+# DBTITLE 1,Train model and register to Unity Catalog
+# Create run name with model type and timestamp
+run_name = f"logistic_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-print("Model training completed!")
-print(f"Model type: {type(clf).__name__}")
-print(f"Accuracy: {metrics['accuracy']:.4f}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Model Registration with MLflow and Unity Catalog
-
-# COMMAND ----------
-
-# DBTITLE 1,Register Model to Unity Catalog
-with mlflow.start_run():
+with mlflow.start_run(run_name=run_name):
+    # Set tags for documentation
+    mlflow.set_tag("model_type", "LogisticRegression")
+    mlflow.set_tag("task", "political_party_classification")
+    mlflow.set_tag("data_source", "tweet_features")
+    mlflow.set_tag("catalog", CATALOG_NAME)
+    mlflow.set_tag("schema", SCHEMA_NAME)
+    mlflow.set_tag("training_timestamp", datetime.now().isoformat())
+    
     # Log parameters
     mlflow.log_param("model_type", "LogisticRegression")
     mlflow.log_param("max_iter", 1000)
     mlflow.log_param("max_features", X.shape[1])
+    mlflow.log_param("test_size", 0.2)
+    mlflow.log_param("random_state", 42)
+    
+    # Train model using our train_model function
+    print("Training model using our train_model function...")
+    clf, metrics = train_model(X_train, y_train, X_test, y_test)
+    
+    print("Model training completed!")
+    print(f"Model type: {type(clf).__name__}")
+    print(f"Accuracy: {metrics['accuracy']:.4f}")
     
     # Log metrics from our train_model function
     mlflow.log_metric("accuracy", metrics['accuracy'])
@@ -191,6 +197,12 @@ with mlflow.start_run():
     )
     
     print(f"Model registered successfully to: {model_uri}")
+    
+    # Log additional training information
+    mlflow.log_param("training_samples", X_train.shape[0])
+    mlflow.log_param("test_samples", X_test.shape[0])
+    mlflow.log_param("feature_count", X.shape[1])
+    mlflow.log_param("class_count", len(np.unique(y)))
 
 # COMMAND ----------
 

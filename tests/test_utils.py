@@ -16,7 +16,7 @@ def test_get_table_name():
 def test_get_model_uri():
     """Test model URI generation"""
     model_uri = get_model_uri("catalog", "schema", "model")
-    assert model_uri == "models:/catalog.schema.model/latest"
+    assert model_uri == "models:/catalog.schema.model"
     
     # Test with custom version
     model_uri_v1 = get_model_uri("catalog", "schema", "model", "1")

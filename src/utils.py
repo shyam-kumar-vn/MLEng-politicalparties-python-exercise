@@ -70,7 +70,7 @@ def get_table_name(catalog_name, schema_name, table_name):
     return f"{catalog_name}.{schema_name}.{table_name}"
 
 
-def get_model_uri(catalog_name, schema_name, model_name, version="latest"):
+def get_model_uri(catalog_name, schema_name, model_name, version=None):
     """
     Generate a model URI for Unity Catalog.
     
@@ -78,12 +78,15 @@ def get_model_uri(catalog_name, schema_name, model_name, version="latest"):
         catalog_name (str): Catalog name
         schema_name (str): Schema name
         model_name (str): Model name
-        version (str): Model version (default: "latest")
+        version (str, optional): Model version. If None, uses the model name without version.
         
     Returns:
         str: Model URI
     """
-    return f"models:/{catalog_name}.{schema_name}.{model_name}/{version}"
+    if version:
+        return f"models:/{catalog_name}.{schema_name}.{model_name}/{version}"
+    else:
+        return f"models:/{catalog_name}.{schema_name}.{model_name}"
 
 
 def create_text_classification_signature():

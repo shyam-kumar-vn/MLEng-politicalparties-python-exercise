@@ -43,15 +43,43 @@ print_parameters(params)
 # DBTITLE 1,Load the trained model
 import mlflow
 import mlflow.pyfunc
+from mlflow.tracking import MlflowClient
 
 # Configure MLflow
 mlflow.set_registry_uri("databricks-uc")
 
-# Load the latest version of the model
-model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
-loaded_model = mlflow.pyfunc.load_model(model_uri)
+# Get the latest version of the model using MLflow client
+client = MlflowClient()
+model_name = f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}"
 
-print(f"Model loaded from: {model_uri}")
+try:
+    # Get all versions of the model
+    model_versions = client.search_model_versions(f"name='{model_name}'")
+    
+    if not model_versions:
+        raise Exception(f"No model versions found for {model_name}")
+    
+    # Get the latest version (highest version number)
+    latest_version = max(model_versions, key=lambda x: x.version)
+    version_number = latest_version.version
+    
+    print(f"Found {len(model_versions)} model versions")
+    print(f"Using latest version: {version_number}")
+    
+    # Load the model with specific version
+    model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, str(version_number))
+    loaded_model = mlflow.pyfunc.load_model(model_uri)
+    
+    print(f"Model loaded from: {model_uri}")
+    
+except Exception as e:
+    print(f"Error loading model: {e}")
+    print("Trying to load model without version specification...")
+    
+    # Fallback: try loading without version
+    model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
+    loaded_model = mlflow.pyfunc.load_model(model_uri)
+    print(f"Model loaded from: {model_uri}")
 
 # COMMAND ----------
 
