@@ -16,17 +16,16 @@
 # COMMAND ----------
 
 # DBTITLE 1,Get parameters
-dbutils.widgets.text("catalog_name", "mle_batch_catalog_2025_q2", "Catalog Name")
-dbutils.widgets.text("schema_name", "mle_shyamkumar_vn", "Schema Name")
-dbutils.widgets.text("model_name", "political_party_classifier", "Model Name")
-
-CATALOG_NAME = dbutils.widgets.get("catalog_name")
-SCHEMA_NAME = dbutils.widgets.get("schema_name")
-MODEL_NAME = dbutils.widgets.get("model_name")
+# Get parameters from workflow, with fallback to default values
+CATALOG_NAME = dbutils.widgets.get("catalog_name") if dbutils.widgets.get("catalog_name") else "mle_batch_catalog_2025_q2"
+SCHEMA_NAME = dbutils.widgets.get("schema_name") if dbutils.widgets.get("schema_name") else "mle_shyamkumar_vn"
+MODEL_NAME = dbutils.widgets.get("model_name") if dbutils.widgets.get("model_name") else "political_party_classifier"
+DBFS_BASE_PATH = dbutils.widgets.get("dbfs_base_path") if dbutils.widgets.get("dbfs_base_path") else "/dbfs/FileStore/shyamkumar.vn"
 
 print(f"Catalog: {CATALOG_NAME}")
 print(f"Schema: {SCHEMA_NAME}")
 print(f"Model: {MODEL_NAME}")
+print(f"DBFS Base Path: {DBFS_BASE_PATH}")
 
 # COMMAND ----------
 
@@ -134,7 +133,7 @@ plt.xlabel('Predicted Label')
 plt.tight_layout()
 
 # Save plot
-confusion_matrix_path = f"/dbfs/FileStore/tables/{SCHEMA_NAME}_confusion_matrix.png"
+confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix.png"
 plt.savefig(confusion_matrix_path, dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -182,7 +181,7 @@ for bar, value in zip(bars, class_performance['F1-Score']):
 plt.tight_layout()
 
 # Save plot
-f1_scores_path = f"/dbfs/FileStore/tables/{SCHEMA_NAME}_f1_scores.png"
+f1_scores_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_f1_scores.png"
 plt.savefig(f1_scores_path, dpi=300, bbox_inches='tight')
 plt.show()
 
@@ -233,7 +232,7 @@ evaluation_summary = {
 
 # Save evaluation summary
 import json
-evaluation_path = f"/dbfs/FileStore/tables/{SCHEMA_NAME}_evaluation_summary.json"
+evaluation_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_evaluation_summary.json"
 with open(evaluation_path, 'w') as f:
     json.dump(evaluation_summary, f, indent=2)
 

@@ -8,8 +8,8 @@
   "max_concurrent_runs": 1,
   "tasks": [
     {
-      "task_key": "data_preparation",
-      "description": "Prepare and validate training data",
+      "task_key": "data_preparation_and_feature_engineering",
+      "description": "Prepare data, clean text, and extract features using DataLoader",
       "depends_on": [],
       "existing_cluster_id": "{{cluster_id}}",
       "notebook_task": {
@@ -17,28 +17,8 @@
         "base_parameters": {
           "catalog_name": "mle_batch_catalog_2025_q2",
           "schema_name": "mle_shyamkumar_vn",
-          "table_name": "tweets_data"
-        }
-      },
-      "timeout_seconds": 3600,
-      "retry_on_timeout": false
-    },
-    {
-      "task_key": "feature_engineering",
-      "description": "Extract features from tweets and save to Delta table",
-      "depends_on": [
-        {
-          "task_key": "data_preparation"
-        }
-      ],
-      "existing_cluster_id": "{{cluster_id}}",
-      "notebook_task": {
-        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/feature_engineering",
-        "base_parameters": {
-          "catalog_name": "mle_batch_catalog_2025_q2",
-          "schema_name": "mle_shyamkumar_vn",
-          "input_table": "tweets_data",
-          "features_table": "tweet_features"
+          "features_table": "tweet_features",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn"
         }
       },
       "timeout_seconds": 3600,
@@ -49,7 +29,7 @@
       "description": "Train the political party classification model",
       "depends_on": [
         {
-          "task_key": "feature_engineering"
+          "task_key": "data_preparation_and_feature_engineering"
         }
       ],
       "existing_cluster_id": "{{cluster_id}}",
@@ -59,7 +39,8 @@
           "catalog_name": "mle_batch_catalog_2025_q2",
           "schema_name": "mle_shyamkumar_vn",
           "model_name": "political_party_classifier",
-          "experiment_name": "/Shared/mle_shyamkumar_vn_tweet_classification"
+          "experiment_name": "/Shared/mle_shyamkumar_vn_tweet_classification",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn"
         }
       },
       "timeout_seconds": 7200,
@@ -79,7 +60,8 @@
         "base_parameters": {
           "catalog_name": "mle_batch_catalog_2025_q2",
           "schema_name": "mle_shyamkumar_vn",
-          "model_name": "political_party_classifier"
+          "model_name": "political_party_classifier",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn"
         }
       },
       "timeout_seconds": 1800,

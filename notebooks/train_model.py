@@ -25,7 +25,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 # Add the src directory to Python path
-sys.path.append('/Workspace/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/src')
+sys.path.append('/Workspace/Users/shyamkumar.vn@thoughtworks.com/MLEng-politicalparties-python-exercise-fork/src')
 from text_loader.loader import DataLoader
 from train_model import train_model
 
@@ -170,8 +170,8 @@ with mlflow.start_run():
     
     # Load preprocessing components
     import pickle
-    vectorizer_path = f"/dbfs/FileStore/tables/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
-    encoder_path = f"/dbfs/FileStore/tables/{SCHEMA_NAME}_label_encoder.pkl"
+    vectorizer_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
+    encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
     
     with open(vectorizer_path, 'rb') as f:
         vectorizer = pickle.load(f)
@@ -236,3 +236,19 @@ print("=" * 60)
 # MAGIC - Evaluated with comprehensive metrics
 # MAGIC - Registered to Unity Catalog
 # MAGIC - Ready for inference 
+
+# COMMAND ----------
+
+# DBTITLE 1,Get parameters
+# Get parameters from workflow, with fallback to default values
+CATALOG_NAME = dbutils.widgets.get("catalog_name") if dbutils.widgets.get("catalog_name") else "mle_batch_catalog_2025_q2"
+SCHEMA_NAME = dbutils.widgets.get("schema_name") if dbutils.widgets.get("schema_name") else "mle_shyamkumar_vn"
+MODEL_NAME = dbutils.widgets.get("model_name") if dbutils.widgets.get("model_name") else "political_party_classifier"
+EXPERIMENT_NAME = dbutils.widgets.get("experiment_name") if dbutils.widgets.get("experiment_name") else "/Shared/mle_shyamkumar_vn_tweet_classification"
+DBFS_BASE_PATH = dbutils.widgets.get("dbfs_base_path") if dbutils.widgets.get("dbfs_base_path") else "/dbfs/FileStore/shyamkumar.vn"
+
+print(f"Catalog: {CATALOG_NAME}")
+print(f"Schema: {SCHEMA_NAME}")
+print(f"Model: {MODEL_NAME}")
+print(f"Experiment: {EXPERIMENT_NAME}")
+print(f"DBFS Base Path: {DBFS_BASE_PATH}") 
