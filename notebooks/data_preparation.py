@@ -124,6 +124,33 @@ features_df = pd.concat([data.reset_index(drop=True), features_df], axis=1)
 # Add encoded labels
 features_df['party_encoded'] = y
 
+# Stratified split for train/validation/test
+from sklearn.model_selection import train_test_split
+
+# First split: train (70%) and temp (30%)
+train_idx, temp_idx = train_test_split(
+    features_df.index,
+    test_size=0.3,
+    random_state=42,
+    stratify=features_df['party_encoded']
+)
+
+# Second split: validation (10%) and test (20%) from temp
+val_idx, test_idx = train_test_split(
+    temp_idx,
+    test_size=2/3,  # 2/3 of 30% = 20%
+    random_state=42,
+    stratify=features_df.loc[temp_idx, 'party_encoded']
+)
+
+# Assign split labels
+features_df['split'] = 'train'
+features_df.loc[val_idx, 'split'] = 'validation'
+features_df.loc[test_idx, 'split'] = 'test'
+
+print("Split distribution:")
+print(features_df['split'].value_counts())
+
 print("Features DataFrame created:")
 print(f"Shape: {features_df.shape}")
 print(f"Columns: {list(features_df.columns)}")

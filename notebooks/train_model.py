@@ -75,30 +75,36 @@ print(f"Loaded {len(data)} samples from {features_table}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Prepare features and labels
+# DBTITLE 1,Prepare features and labels using split column
 # Extract feature columns
 feature_columns = [col for col in data.columns if col.startswith('feature_')]
+
+# Split data using the split column from data preparation
+train_data = data[data['split'] == 'train']
+test_data = data[data['split'] == 'test']
+
+# Prepare training data
+X_train = train_data[feature_columns].values
+y_train = train_data['party_encoded'].values
+
+# Prepare test data
+X_test = test_data[feature_columns].values
+y_test = test_data['party_encoded'].values
+
+print(f"Training set size: {X_train.shape[0]}")
+print(f"Test set size: {X_test.shape[0]}")
+print(f"Feature matrix shape: {X_train.shape[1]}")
+print(f"Training label distribution: {np.bincount(y_train)}")
+print(f"Test label distribution: {np.bincount(y_test)}")
+
+# Store full feature matrix for logging
 X = data[feature_columns].values
 y = data['party_encoded'].values
-
-print(f"Feature matrix shape: {X.shape}")
-print(f"Label distribution: {np.bincount(y)}")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Model Training and Registration with MLflow and Unity Catalog
-
-# COMMAND ----------
-
-# DBTITLE 1,Split data for training
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
-
-print(f"Training set size: {X_train.shape[0]}")
-print(f"Test set size: {X_test.shape[0]}")
 
 # COMMAND ----------
 
@@ -119,7 +125,10 @@ with mlflow.start_run(run_name=run_name):
     mlflow.log_param("model_type", "LogisticRegression")
     mlflow.log_param("max_iter", 1000)
     mlflow.log_param("max_features", X.shape[1])
-    mlflow.log_param("test_size", 0.2)
+    mlflow.log_param("data_split_method", "stratified_split_column")
+    mlflow.log_param("train_split_ratio", 0.7)
+    mlflow.log_param("test_split_ratio", 0.2)
+    mlflow.log_param("validation_split_ratio", 0.1)
     mlflow.log_param("random_state", 42)
     
     # Train model using our train_model function
@@ -203,6 +212,47 @@ with mlflow.start_run(run_name=run_name):
     mlflow.log_param("test_samples", X_test.shape[0])
     mlflow.log_param("feature_count", X.shape[1])
     mlflow.log_param("class_count", len(np.unique(y)))
+    
+    # Evaluate on validation set for model comparison
+    validation_data = data[data['split'] == 'validation']
+    X_val = validation_data[feature_columns].values
+    y_val = validation_data['party_encoded'].values
+    
+    # Make predictions on validation set
+    val_predictions = clf.predict(X_val)
+    
+    # Calculate validation metrics
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    val_accuracy = accuracy_score(y_val, val_predictions)
+    val_precision = precision_score(y_val, val_predictions, average='weighted', zero_division=0)
+    val_recall = recall_score(y_val, val_predictions, average='weighted', zero_division=0)
+    val_f1 = f1_score(y_val, val_predictions, average='weighted', zero_division=0)
+    
+    # Log validation metrics
+    mlflow.log_metric("validation_accuracy", val_accuracy)
+    mlflow.log_metric("validation_precision", val_precision)
+    mlflow.log_metric("validation_recall", val_recall)
+    mlflow.log_metric("validation_f1_score", val_f1)
+    
+    print(f"Validation set size: {X_val.shape[0]}")
+    print(f"Validation Accuracy: {val_accuracy:.4f}")
+    print(f"Validation F1 Score: {val_f1:.4f}")
+    
+    # Store validation metrics for model promotion decision
+    validation_metrics = {
+        'accuracy': val_accuracy,
+        'precision': val_precision,
+        'recall': val_recall,
+        'f1_score': val_f1
+    }
+    
+    # Save validation metrics to file for model promotion workflow
+    import json
+    validation_metrics_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_validation_metrics.json"
+    with open(validation_metrics_path, 'w') as f:
+        json.dump(validation_metrics, f, indent=2)
+    
+    print(f"Validation metrics saved to: {validation_metrics_path}")
 
 # COMMAND ----------
 

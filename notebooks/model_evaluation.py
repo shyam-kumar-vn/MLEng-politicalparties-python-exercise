@@ -40,7 +40,7 @@ print_parameters(params)
 
 # COMMAND ----------
 
-# DBTITLE 1,Load the trained model
+# DBTITLE 1,Load the production model
 import mlflow
 import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
@@ -48,50 +48,72 @@ from mlflow.tracking import MlflowClient
 # Configure MLflow
 mlflow.set_registry_uri("databricks-uc")
 
-# Get the latest version of the model using MLflow client
+# Get the production model using alias
 client = MlflowClient()
 model_name = f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}"
+PRODUCTION_ALIAS = "production"
 
 try:
-    # Get all versions of the model
-    model_versions = client.search_model_versions(f"name='{model_name}'")
+    # Get the model version with production alias
+    production_version = client.get_model_version_by_alias(model_name, PRODUCTION_ALIAS)
+    production_version_number = production_version.version
     
-    if not model_versions:
-        raise Exception(f"No model versions found for {model_name}")
+    print(f"Found production model version: {production_version_number}")
     
-    # Get the latest version (highest version number)
-    latest_version = max(model_versions, key=lambda x: x.version)
-    version_number = latest_version.version
-    
-    print(f"Found {len(model_versions)} model versions")
-    print(f"Using latest version: {version_number}")
-    
-    # Load the model with specific version
-    model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, str(version_number))
+    # Load the production model
+    model_uri = f"models:/{model_name}@{PRODUCTION_ALIAS}"
     loaded_model = mlflow.pyfunc.load_model(model_uri)
     
-    print(f"Model loaded from: {model_uri}")
+    print(f"Production model loaded from: {model_uri}")
     
 except Exception as e:
-    print(f"Error loading model: {e}")
-    print("Trying to load model without version specification...")
+    print(f"Error loading production model: {e}")
+    print("Trying to load latest model version as fallback...")
     
-    # Fallback: try loading without version
-    model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME)
-    loaded_model = mlflow.pyfunc.load_model(model_uri)
-    print(f"Model loaded from: {model_uri}")
+    try:
+        # Fallback: get the latest version
+        model_versions = client.search_model_versions(f"name='{model_name}'")
+        
+        if not model_versions:
+            raise Exception(f"No model versions found for {model_name}")
+        
+        latest_version = max(model_versions, key=lambda x: x.version)
+        version_number = latest_version.version
+        
+        print(f"Using latest version as fallback: {version_number}")
+        
+        # Load the model with specific version
+        model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, str(version_number))
+        loaded_model = mlflow.pyfunc.load_model(model_uri)
+        
+        print(f"Model loaded from: {model_uri}")
+        
+    except Exception as fallback_error:
+        print(f"Error loading model: {fallback_error}")
+        raise Exception("Could not load any model for evaluation")
 
 # COMMAND ----------
 
-# DBTITLE 1,Load test data
+# DBTITLE 1,Load test data using split column
 # Load features from Delta table
 features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
 df = spark.read.table(features_table)
 
-# Convert to pandas for evaluation
-test_data = df.toPandas()
+# Filter for test data only using the split column
+test_df = df.filter(df.split == "test")
 
-print(f"Loaded {len(test_data)} samples for evaluation")
+# Convert to pandas for evaluation
+test_data = test_df.toPandas()
+
+print(f"Loaded {len(test_data)} test samples for evaluation")
+print(f"Split distribution in loaded data:")
+print(test_data['split'].value_counts())
+
+# Show overall split distribution for context
+full_data = df.toPandas()
+print(f"\nOverall split distribution in full dataset:")
+print(full_data['split'].value_counts())
+print(f"Total samples: {len(full_data)}")
 
 # COMMAND ----------
 
@@ -114,7 +136,10 @@ print(f"Test labels shape: {y_true.shape}")
 # DBTITLE 1,Make predictions
 # Make predictions using the loaded model
 # Note: The model expects raw text, so we need to use the original tweets
-predictions = loaded_model.predict(test_data[['Tweet']])
+# Rename 'Tweet' column to 'text' to match model signature
+prediction_data = test_data[['Tweet']].copy()
+prediction_data.columns = ['text']
+predictions = loaded_model.predict(prediction_data)
 
 print(f"Generated {len(predictions)} predictions")
 

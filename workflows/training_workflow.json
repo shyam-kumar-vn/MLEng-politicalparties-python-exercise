@@ -9,7 +9,7 @@
   "tasks": [
     {
       "task_key": "data_preparation_and_feature_engineering",
-      "description": "Prepare data, clean text, and extract features using DataLoader",
+      "description": "Prepare data, clean text, and extract features using DataLoader with train/test/validation splits",
       "depends_on": [],
       "existing_cluster_id": "{{cluster_id}}",
       "notebook_task": {
@@ -26,7 +26,7 @@
     },
     {
       "task_key": "model_training",
-      "description": "Train the political party classification model",
+      "description": "Train the political party classification model and evaluate on validation set",
       "depends_on": [
         {
           "task_key": "data_preparation_and_feature_engineering"
@@ -47,11 +47,34 @@
       "retry_on_timeout": false
     },
     {
-      "task_key": "model_evaluation",
-      "description": "Evaluate model performance and generate reports",
+      "task_key": "model_promotion",
+      "description": "Compare new model with production model and promote if better",
       "depends_on": [
         {
           "task_key": "model_training"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/model_promotion",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "model_name": "political_party_classifier",
+          "production_alias": "production",
+          "staging_alias": "staging",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn"
+        }
+      },
+      "timeout_seconds": 1800,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "model_evaluation",
+      "description": "Evaluate production model performance and generate reports",
+      "depends_on": [
+        {
+          "task_key": "model_promotion"
         }
       ],
       "existing_cluster_id": "{{cluster_id}}",

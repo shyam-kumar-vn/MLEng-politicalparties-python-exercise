@@ -4,10 +4,11 @@ This directory contains the Databricks integration for the Political Party Tweet
 
 ## Overview
 
-The batch training workflow consists of three main tasks that reuse our existing components:
-1. **Data Preparation and Feature Engineering** - Load data and extract features using DataLoader's preprocessing methods
-2. **Model Training** - Train the classification model using our train_model function
-3. **Model Evaluation** - Evaluate model performance and generate reports
+The batch training workflow consists of four main tasks that reuse our existing components:
+1. **Data Preparation and Feature Engineering** - Load data and extract features using DataLoader's preprocessing methods with train/test/validation splits (70/20/10)
+2. **Model Training** - Train the classification model using our train_model function and evaluate on validation set
+3. **Model Promotion** - Compare new model with production model and promote if better (using validation performance)
+4. **Model Evaluation** - Evaluate production model performance and generate reports
 
 ## Component Reuse
 
@@ -15,6 +16,7 @@ The Databricks notebooks are designed to reuse the existing components from the 
 
 - **DataLoader** (`src/text_loader/loader.py`) - Used for data loading and feature preprocessing (includes text cleaning)
 - **train_model function** (`src/train_model.py`) - Used for model training and evaluation
+- **Utils** (`src/utils.py`) - Common utilities for widget handling, model URI generation, and MLflow setup
 
 This ensures consistency between local development and Databricks execution.
 
@@ -23,8 +25,9 @@ This ensures consistency between local development and Databricks execution.
 ```
 databricks/
 ├── notebooks/
-│   ├── data_preparation.py      # Combined data loading and feature extraction
-│   ├── train_model.py          # Model training using train_model function
+│   ├── data_preparation.py      # Combined data loading and feature extraction with splits
+│   ├── train_model.py          # Model training using train_model function with validation
+│   ├── model_promotion.py      # Model comparison and promotion logic
 │   └── model_evaluation.py     # Model evaluation and reporting
 ├── workflows/
 │   └── training_workflow.json   # Workflow configuration
@@ -85,6 +88,7 @@ cd MLEng-politicalparties-python-exercise-1
    - `data/Tweets.csv` - The input dataset
    - `src/text_loader/loader.py` - DataLoader component
    - `src/train_model.py` - Training function
+   - `src/utils.py` - Utils component
    - `databricks/notebooks/*.py` - Databricks notebooks
 
 ### Step 3: Upload to Databricks Workspace
@@ -96,6 +100,7 @@ cd MLEng-politicalparties-python-exercise-1
    - Create folder: `src/text_loader/`
    - Upload `src/text_loader/loader.py` to `src/text_loader/`
    - Upload `src/train_model.py` to `src/`
+   - Upload `src/utils.py` if it exists
    - Upload `src/text_loader/__init__.py` if it exists
 
 #### 3.2 Upload Notebooks
@@ -160,12 +165,24 @@ cd MLEng-politicalparties-python-exercise-1
    - `experiment_name`: `/Shared/mle_shyamkumar_vn_tweet_classification`
    - `dbfs_base_path`: `/dbfs/FileStore/shyamkumar.vn`
 
-**Task 3: Model Evaluation**
+**Task 3: Model Promotion**
+1. Click **Add task** → **Notebook**
+2. **Task name**: `model_promotion`
+3. **Notebook path**: `/Workspace/Users/shyamkumar.vn@thoughtworks.com/MLEng-politicalparties-python-exercise-fork/databricks/notebooks/model_promotion`
+4. **Cluster**: Select your cluster
+5. **Dependencies**: Add dependency on `model_training`
+6. **Parameters**:
+   - `catalog_name`: `mle_batch_catalog_2025_q2`
+   - `schema_name`: `mle_shyamkumar_vn`
+   - `model_name`: `political_party_classifier`
+   - `dbfs_base_path`: `/dbfs/FileStore/shyamkumar.vn`
+
+**Task 4: Model Evaluation**
 1. Click **Add task** → **Notebook**
 2. **Task name**: `model_evaluation`
 3. **Notebook path**: `/Workspace/Users/shyamkumar.vn@thoughtworks.com/MLEng-politicalparties-python-exercise-fork/databricks/notebooks/model_evaluation`
 4. **Cluster**: Select your cluster
-5. **Dependencies**: Add dependency on `model_training`
+5. **Dependencies**: Add dependency on `model_promotion`
 6. **Parameters**:
    - `catalog_name`: `mle_batch_catalog_2025_q2`
    - `schema_name`: `mle_shyamkumar_vn`
@@ -205,6 +222,8 @@ cd MLEng-politicalparties-python-exercise-1
    - `mle_shyamkumar_vn_confusion_matrix.png`
    - `mle_shyamkumar_vn_f1_scores.png`
    - `mle_shyamkumar_vn_evaluation_summary.json`
+   - `mle_shyamkumar_vn_validation_metrics.json`
+   - `mle_shyamkumar_vn_promotion_log.json`
 
 #### 7.3 MLflow Experiment
 1. Go to **MLflow** → **Experiments**
@@ -246,7 +265,7 @@ python deploy_workflow.py
 
 ### Task Dependencies
 ```
-data_preparation_and_feature_engineering → model_training → model_evaluation
+data_preparation_and_feature_engineering → model_training → model_promotion → model_evaluation
 ```
 
 ### Task Descriptions
@@ -264,12 +283,50 @@ data_preparation_and_feature_engineering → model_training → model_evaluation
 - Registers model to Unity Catalog
 - Logs experiment with MLflow
 
-#### 3. Model Evaluation
+#### 3. Model Promotion
+- Loads newly trained model and its validation metrics
+- Loads current production model using production alias
+- Compares both models on validation set
+- Promotes new model if F1 score improvement > 0.01
+- Updates production and staging aliases
+- Logs promotion decision and metrics
+
+#### 4. Model Evaluation
 - Loads trained model from Unity Catalog
 - Evaluates on test data
 - Generates performance metrics
 - Creates visualizations (confusion matrix, F1 scores)
 - Saves evaluation report
+
+## Model Promotion Logic
+
+### Promotion Criteria
+The model promotion step uses the following criteria to decide whether to promote a new model:
+
+1. **Primary Metric**: F1 Score on validation set
+2. **Threshold**: 0.01 improvement over current production model
+3. **Comparison**: New model vs. current production model on same validation set
+
+### Promotion Process
+1. **Load Validation Data**: Uses the 10% validation split from data preparation
+2. **Evaluate New Model**: Calculates validation metrics for newly trained model
+3. **Load Production Model**: Retrieves current production model using alias
+4. **Compare Performance**: Evaluates production model on same validation set
+5. **Make Decision**: Promotes if improvement exceeds threshold
+6. **Update Aliases**: 
+   - Sets production alias to better model
+   - Moves previous model to staging alias
+7. **Log Decision**: Saves promotion log with timestamps and metrics
+
+### Alias Management
+- **Production Alias**: `production` - Points to the currently deployed model
+- **Staging Alias**: `staging` - Points to the previous production model (for rollback)
+
+### Configuration
+The promotion threshold can be adjusted in the `model_promotion.py` notebook:
+```python
+PROMOTION_THRESHOLD = 0.01  # F1 score improvement required for promotion
+```
 
 ## Component Integration
 
@@ -300,7 +357,12 @@ data_preparation_and_feature_engineering → model_training → model_evaluation
 - Processing: Uses train_model function for training and evaluation
 - Output: Registered model in Unity Catalog
 
-### Step 3: Model Evaluation
+### Step 3: Model Promotion
+- Input: New model and production model
+- Processing: Compare model performance
+- Output: Promoted model
+
+### Step 4: Model Evaluation
 - Input: Trained model + test data
 - Processing: Performance evaluation and visualization
 - Output: Evaluation reports and visualizations
@@ -320,6 +382,8 @@ data_preparation_and_feature_engineering → model_training → model_evaluation
 - Evaluation summary JSON: `{schema}_evaluation_summary.json`
 - TF-IDF vectorizer pickle file: `{schema}_tfidf_vectorizer.pkl`
 - Label encoder pickle file: `{schema}_label_encoder.pkl`
+- Validation metrics JSON: `{schema}_validation_metrics.json`
+- Model promotion log JSON: `{schema}_promotion_log.json`
 
 ## Monitoring
 
