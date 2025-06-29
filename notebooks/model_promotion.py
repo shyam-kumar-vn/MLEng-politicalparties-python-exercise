@@ -24,6 +24,7 @@ import pandas as pd
 import json
 from mlflow.tracking import MlflowClient
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import pickle
 
 from src.utils import get_widget_value, get_model_uri, print_parameters, get_table_name
 
@@ -133,7 +134,26 @@ if current_production_version is not None:
     # Rename 'Tweet' column to 'text' to match model signature
     prediction_data = validation_data[['Tweet']].copy()
     prediction_data.columns = ['text']
-    current_predictions = current_model.predict(prediction_data)
+    current_predictions_raw = current_model.predict(prediction_data)
+    
+    # Load the label encoder used during training
+    encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
+    
+    try:
+        with open(encoder_path, 'rb') as f:
+            label_encoder = pickle.load(f)
+        
+        # Convert string predictions back to encoded integers
+        current_predictions = label_encoder.transform(current_predictions_raw)
+        
+        print(f"Raw predictions: {current_predictions_raw[:5]}")  # Show first 5 predictions
+        print(f"Encoded predictions: {current_predictions[:5]}")  # Show first 5 encoded predictions
+        print(f"True labels: {y_val[:5]}")  # Show first 5 true labels
+        
+    except Exception as e:
+        print(f"Error loading label encoder: {e}")
+        print("Using raw predictions for comparison (may cause label mismatch)")
+        current_predictions = current_predictions_raw
     
     # Calculate metrics for current production model
     current_accuracy = accuracy_score(y_val, current_predictions)
