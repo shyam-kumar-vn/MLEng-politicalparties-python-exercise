@@ -67,7 +67,7 @@ features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
 df = spark.read.table(features_table)
 
 # Filter for validation data only
-validation_df = df.filter(df.split == "validation")
+validation_df = df.filter(df["split"] == "validation")
 validation_data = validation_df.toPandas()
 
 print(f"Loaded {len(validation_data)} validation samples")
