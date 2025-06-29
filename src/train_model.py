@@ -4,7 +4,7 @@ import mlflow.sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
-from text_loader.loader import DataLoader
+from src.text_loader.loader import DataLoader
 
 def train_model(X_train, y_train, X_test, y_test, model_type="LogisticRegression", max_iter=1000, random_state=42):
     """

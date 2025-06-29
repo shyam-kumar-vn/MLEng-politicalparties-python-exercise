@@ -1,7 +1,8 @@
 """
 Common utilities for Databricks notebooks.
 """
-
+import mlflow
+mlflow.set_registry_uri("databricks-uc")
 def get_widget_value(widget_name, default_value):
     """
     Safely get widget value with fallback to default.
