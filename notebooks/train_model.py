@@ -5,7 +5,7 @@
 # MAGIC This notebook implements the batch training workflow using our existing components:
 # MAGIC 1. Data Loading and Preprocessing using DataLoader
 # MAGIC 2. Feature Engineering using DataLoader
-# MAGIC 3. Model Training using our train_model function
+# MAGIC 3. Model Training using XGBoost (updated from Logistic Regression)
 # MAGIC 4. Model Registration to Unity Catalog
 
 # COMMAND ----------
@@ -19,10 +19,13 @@
 import os
 import mlflow
 import mlflow.sklearn
+import mlflow.xgboost
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from datetime import datetime
+import xgboost as xgb
+import json
 
 from src.text_loader.loader import DataLoader
 from src.train_model import train_model
@@ -116,11 +119,12 @@ print(f"Test set shape: {X_test.shape}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Train the model
-# Train the model using our train_model function
-clf, metrics = train_model(X_train, y_train, X_test, y_test)
+# DBTITLE 1,Train the model using XGBoost
+# Train the model using our train_model function with XGBoost
+clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="XGBoost")
 
 print("Training completed!")
+print(f"Model type: {type(clf).__name__}")
 print(f"Test Accuracy: {metrics['accuracy']:.4f}")
 print(f"Test Precision: {metrics['precision']:.4f}")
 print(f"Test Recall: {metrics['recall']:.4f}")
@@ -155,13 +159,15 @@ print(f"Label encoder saved to: {encoder_path}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Register model to Unity Catalog
+# DBTITLE 1,Register model to Unity Catalog (Staging)
 # Start MLflow run for model registration
-with mlflow.start_run(run_name="political_party_classifier_training") as run:
+with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as run:
     
     # Log parameters
-    mlflow.log_param("model_type", "LogisticRegression")
-    mlflow.log_param("max_iter", 1000)
+    mlflow.log_param("model_type", "XGBoost")
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_param("max_depth", 6)
+    mlflow.log_param("learning_rate", 0.1)
     mlflow.log_param("random_state", 42)
     mlflow.log_param("training_samples", X_train.shape[0])
     mlflow.log_param("test_samples", X_test.shape[0])
@@ -181,11 +187,11 @@ with mlflow.start_run(run_name="political_party_classifier_training") as run:
     cm = metrics['confusion_matrix']
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix - Test Set')
+    plt.title('Confusion Matrix - Test Set (XGBoost)')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     
-    confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix.png"
+    confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix_xgboost.png"
     plt.savefig(confusion_matrix_path, dpi=300, bbox_inches='tight')
     mlflow.log_artifact(confusion_matrix_path)
     plt.close()
@@ -300,12 +306,28 @@ with mlflow.start_run(run_name="political_party_classifier_training") as run:
     mlflow.log_metric("validation_recall", val_recall)
     mlflow.log_metric("validation_f1_score", val_f1)
     
+    # Save validation metrics for model promotion workflow
+    validation_metrics = {
+        'accuracy': val_accuracy,
+        'precision': val_precision,
+        'recall': val_recall,
+        'f1_score': val_f1
+    }
+    
+    # Save validation metrics to file for model promotion workflow
+    validation_metrics_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_validation_metrics.json"
+    with open(validation_metrics_path, 'w') as f:
+        json.dump(validation_metrics, f, indent=2)
+    
+    print(f"Validation metrics saved to: {validation_metrics_path}")
+    
     # Add tags for better organization
     mlflow.set_tag("model_type", "political_party_classifier")
-    mlflow.set_tag("framework", "scikit-learn")
+    mlflow.set_tag("framework", "xgboost")
     mlflow.set_tag("task", "text_classification")
     mlflow.set_tag("author", "mle_shyamkumar_vn")
-    mlflow.set_tag("version", "1.0.0")
+    mlflow.set_tag("version", "2.0.0")
+    mlflow.set_tag("stage", "staging")
     
     print("Validation metrics:")
     print(f"  Accuracy: {val_accuracy:.4f}")
@@ -316,12 +338,12 @@ with mlflow.start_run(run_name="political_party_classifier_training") as run:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Model Promotion to Production
+# MAGIC ## Model Registration to Staging
 
 # COMMAND ----------
 
-# DBTITLE 1,Promote model to production alias
-# Get the latest model version
+# DBTITLE 1,Register model to staging stage
+# Get the latest model version and set it to staging
 client = mlflow.tracking.MlflowClient()
 model_versions = client.search_model_versions(
     f"name='{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}'"
@@ -330,15 +352,16 @@ model_versions = client.search_model_versions(
 if model_versions:
     latest_version = max(model_versions, key=lambda x: x.version)
     
-    # Transition to production
+    # Transition to staging (not production)
     client.transition_model_version_stage(
         name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}",
         version=latest_version.version,
-        stage="Production"
+        stage="Staging"
     )
     
-    print(f"Model version {latest_version.version} promoted to Production")
+    print(f"Model version {latest_version.version} registered to Staging")
     print(f"Model URI: {model_uri}")
+    print("Note: Use the model promotion workflow to promote to Production after validation")
 else:
     print("No model versions found")
 
@@ -351,7 +374,7 @@ else:
 
 # DBTITLE 1,Display training summary
 print("="*80)
-print("POLITICAL PARTY CLASSIFIER TRAINING SUMMARY")
+print("POLITICAL PARTY CLASSIFIER TRAINING SUMMARY (XGBoost)")
 print("="*80)
 print(f"Model: {CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}")
 print(f"Experiment: {EXPERIMENT_NAME}")
@@ -363,6 +386,12 @@ print(f"  Validation samples: {len(validation_data)}")
 print(f"  Test samples: {X_test.shape[0]}")
 print(f"  Features: {X_train.shape[1]}")
 print(f"  Classes: {len(np.unique(y_train))}")
+print()
+print("XGBOOST PARAMETERS:")
+print(f"  n_estimators: 100")
+print(f"  max_depth: 6")
+print(f"  learning_rate: 0.1")
+print(f"  eval_metric: logloss")
 print()
 print("PERFORMANCE:")
 print(f"  Test Accuracy: {metrics['accuracy']:.4f}")
@@ -378,9 +407,16 @@ print(f"  Validation F1 Score: {val_f1:.4f}")
 print()
 print("ARTIFACTS:")
 print(f"  Model URI: {model_uri}")
+print(f"  Model Stage: Staging")
 print(f"  Vectorizer: {vectorizer_path}")
 print(f"  Label Encoder: {encoder_path}")
 print(f"  Confusion Matrix: {confusion_matrix_path}")
+print(f"  Validation Metrics: {validation_metrics_path}")
+print()
+print("NEXT STEPS:")
+print(f"  1. Review model performance in Staging")
+print(f"  2. Run model promotion workflow to promote to Production")
+print(f"  3. Deploy to serving endpoint if approved")
 print("="*80)
 
 # COMMAND ----------
@@ -389,9 +425,9 @@ print("="*80)
 # MAGIC ## Training Complete!
 # MAGIC 
 # MAGIC The political party classifier has been successfully:
-# MAGIC - Trained on the tweet dataset
+# MAGIC - Trained using XGBoost (upgraded from Logistic Regression)
 # MAGIC - Evaluated on test and validation sets
-# MAGIC - Registered to Unity Catalog
-# MAGIC - Promoted to production
+# MAGIC - Registered to Unity Catalog in Staging stage
+# MAGIC - Validation metrics saved for promotion workflow
 # MAGIC 
-# MAGIC The model is now ready for deployment and inference! 
+# MAGIC The XGBoost model is now in Staging and ready for promotion review! 

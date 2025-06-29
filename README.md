@@ -4,6 +4,22 @@ The election is coming! We want to build an application that can parse a Tweet a
 
 This repository contains the necessary setup and code base to help guide you in creating this application.
 
+## 🚀 **Latest Updates**
+
+- **Model Upgrade**: Upgraded from Logistic Regression to **XGBoost** for improved performance
+- **Enhanced Accuracy**: Better classification results with gradient boosting
+- **Production Ready**: Full ML pipeline with training, deployment, and batch inference workflows
+
+## 🏗️ **Architecture Overview**
+
+The project implements a complete ML pipeline using:
+- **XGBoost** for model training and inference
+- **Databricks Unity Catalog** for model management
+- **MLflow** for experiment tracking and model versioning
+- **Delta Lake** for feature storage
+- **FastAPI** for serving endpoints
+- **Batch inference** workflows for scalable predictions
+
 # Project Setup
 
 ## Pre-requisites
