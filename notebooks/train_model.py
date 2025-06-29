@@ -149,27 +149,18 @@ with mlflow.start_run():
             self.model = model
             self.vectorizer = vectorizer
             self.label_encoder = label_encoder
+            # Create a DataLoader instance for text cleaning
+            self.data_loader = DataLoader()
         
         def predict(self, context, model_input):
             # Clean text using DataLoader's clean_text method
-            cleaned_text = model_input.iloc[:, 0].apply(self.clean_text)
+            cleaned_text = model_input.iloc[:, 0].apply(self.data_loader.clean_text)
             # Vectorize
             X = self.vectorizer.transform(cleaned_text)
             # Predict
             predictions = self.model.predict(X)
             # Convert back to original labels
             return self.label_encoder.inverse_transform(predictions)
-        
-        def clean_text(self, text):
-            """Clean text using DataLoader's method."""
-            if not isinstance(text, str):
-                return ""
-            import re
-            # Remove URLs
-            text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
-            # Remove all non-alphabetic characters
-            text = re.sub(r'[^a-zA-Z]', '', text)
-            return text.strip()
     
     # Load preprocessing components
     import pickle

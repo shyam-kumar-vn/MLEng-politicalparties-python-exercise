@@ -21,7 +21,7 @@ def data_loader(mocker, mock_df):
 
 def test_load_data(mocker, mock_df):
     data_loader = DataLoader()
-    mocker.patch.object(data_loader, 'data',  mock_df)
+    mocker.patch('pandas.read_csv', return_value=mock_df)
     data_loader.load_data()
     assert not data_loader.data.empty, "Data should not be empty after loading."
 

@@ -60,9 +60,10 @@ print("DataLoader imported successfully")
 # COMMAND ----------
 
 # DBTITLE 1,Load data using DataLoader
-# Initialize DataLoader with the CSV file path in DBFS
+# Initialize DataLoader and load data with the CSV file path in DBFS
 csv_path = f"{DBFS_BASE_PATH}/Tweets.csv"
-loader = DataLoader(filepath=csv_path)
+loader = DataLoader()
+loader.load_data(filepath=csv_path)
 
 # Load the data (null tweets are automatically filtered in DataLoader)
 data = loader.data

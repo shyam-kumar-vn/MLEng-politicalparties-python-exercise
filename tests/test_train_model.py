@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score
 # Step 1: Test DataLoader Integration
 def test_dataloader_shapes():
     loader = DataLoader()
+    loader.load_data()  # Load data first
     X = loader.preprocess_tweets()
     y = loader.preprocess_parties()
     assert len(X) == len(y), "Features and labels must have the same number of samples."

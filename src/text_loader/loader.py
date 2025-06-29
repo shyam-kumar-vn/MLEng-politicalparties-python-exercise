@@ -5,25 +5,25 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 
 class DataLoader:
-    def __init__(self, filepath="data/Tweets.csv"):
-        self.filepath = filepath
-        self.data = self.load_data()
+    def __init__(self):
+        self.data = None
         self.vectorizer = None
         self.encoder = None
 
-    def load_data(self):
+    def load_data(self, filepath="data/Tweets.csv"):
         """Loads data from a CSV file and filters out null tweets."""
-        data = pd.read_csv(self.filepath)
+        data = pd.read_csv(filepath)
         
         # Filter out rows where tweet is null
         initial_count = len(data)
         data = data.dropna(subset=['Tweet'])
         filtered_count = len(data)
         
-        print(f"Loaded {initial_count} tweets from {self.filepath}")
+        print(f"Loaded {initial_count} tweets from {filepath}")
         print(f"After filtering null tweets: {filtered_count} tweets")
         print(f"Removed {initial_count - filtered_count} rows with null tweets")
         
+        self.data = data
         return data
 
     @staticmethod
@@ -51,10 +51,14 @@ class DataLoader:
         return self.encoder.fit_transform(parties)
 
     def preprocess_tweets(self):
+        if self.data is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
         self.data.Tweet = self.data.Tweet.apply(self.clean_text)
         return self.vectorize_text(self.data.Tweet.values)
 
     def preprocess_parties(self):
+        if self.data is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
         self.data.Party = self.data.Party.apply(self.clean_text)
         return self.label_encoder(self.data.Party.values)
 
