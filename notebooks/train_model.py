@@ -115,52 +115,12 @@ print(f"Test set shape: {X_test.shape}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Model Training
+# MAGIC ## Model Training and Registration with MLflow
 
 # COMMAND ----------
 
-# DBTITLE 1,Train the model using XGBoost
-# Train the model using our train_model function with XGBoost
-clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="XGBoost")
-
-print("Training completed!")
-print(f"Model type: {type(clf).__name__}")
-print(f"Test Accuracy: {metrics['accuracy']:.4f}")
-print(f"Test Precision: {metrics['precision']:.4f}")
-print(f"Test Recall: {metrics['recall']:.4f}")
-print(f"Test F1 Score: {metrics['f1_score']:.4f}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Save Preprocessing Components
-
-# COMMAND ----------
-
-# DBTITLE 1,Save vectorizer and label encoder for model deployment
-import pickle
-
-# Save the vectorizer
-vectorizer_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
-with open(vectorizer_path, 'wb') as f:
-    pickle.dump(loader.vectorizer, f)
-print(f"Vectorizer saved to: {vectorizer_path}")
-
-# Save the label encoder
-encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
-with open(encoder_path, 'wb') as f:
-    pickle.dump(loader.encoder, f)
-print(f"Label encoder saved to: {encoder_path}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Model Registration with MLflow
-
-# COMMAND ----------
-
-# DBTITLE 1,Register model to Unity Catalog (Staging)
-# Start MLflow run for model registration
+# DBTITLE 1,Train and register model with XGBoost (Atomic MLflow Run)
+# Start MLflow run for atomic training and registration
 with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as run:
     
     # Log parameters
@@ -174,11 +134,36 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
     mlflow.log_param("feature_count", X_train.shape[1])
     mlflow.log_param("class_count", len(np.unique(y_train)))
     
+    # Train the model using our train_model function with XGBoost
+    clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="XGBoost")
+    
+    print("Training completed!")
+    print(f"Model type: {type(clf).__name__}")
+    print(f"Test Accuracy: {metrics['accuracy']:.4f}")
+    print(f"Test Precision: {metrics['precision']:.4f}")
+    print(f"Test Recall: {metrics['recall']:.4f}")
+    print(f"Test F1 Score: {metrics['f1_score']:.4f}")
+    
     # Log metrics
     mlflow.log_metric("test_accuracy", metrics['accuracy'])
     mlflow.log_metric("test_precision", metrics['precision'])
     mlflow.log_metric("test_recall", metrics['recall'])
     mlflow.log_metric("test_f1_score", metrics['f1_score'])
+    
+    # Save preprocessing components
+    import pickle
+    
+    # Save the vectorizer
+    vectorizer_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
+    with open(vectorizer_path, 'wb') as f:
+        pickle.dump(loader.vectorizer, f)
+    print(f"Vectorizer saved to: {vectorizer_path}")
+    
+    # Save the label encoder
+    encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
+    with open(encoder_path, 'wb') as f:
+        pickle.dump(loader.encoder, f)
+    print(f"Label encoder saved to: {encoder_path}")
     
     # Log confusion matrix as artifact
     import matplotlib.pyplot as plt
@@ -250,10 +235,6 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
             return self.label_encoder.inverse_transform(predictions)
     
     # Load preprocessing components
-    import pickle
-    vectorizer_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
-    encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
-    
     with open(vectorizer_path, 'rb') as f:
         vectorizer = pickle.load(f)
     
@@ -278,12 +259,6 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
     )
     
     print(f"Model registered successfully to: {model_uri}")
-    
-    # Log additional training information
-    mlflow.log_param("training_samples", X_train.shape[0])
-    mlflow.log_param("test_samples", X_test.shape[0])
-    mlflow.log_param("feature_count", X.shape[1])
-    mlflow.log_param("class_count", len(np.unique(y)))
     
     # Evaluate on validation set for model comparison
     validation_data = data[data['split'] == 'validation']
@@ -327,7 +302,7 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
     mlflow.set_tag("task", "text_classification")
     mlflow.set_tag("author", "mle_shyamkumar_vn")
     mlflow.set_tag("version", "2.0.0")
-    mlflow.set_tag("stage", "staging")
+    mlflow.set_tag("alias", "staging")
     
     print("Validation metrics:")
     print(f"  Accuracy: {val_accuracy:.4f}")
@@ -338,12 +313,12 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Model Registration to Staging
+# MAGIC ## Model Registration to Staging Alias
 
 # COMMAND ----------
 
-# DBTITLE 1,Register model to staging stage
-# Get the latest model version and set it to staging
+# DBTITLE 1,Register model to staging alias
+# Get the latest model version and set it to staging alias
 client = mlflow.tracking.MlflowClient()
 model_versions = client.search_model_versions(
     f"name='{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}'"
@@ -352,16 +327,21 @@ model_versions = client.search_model_versions(
 if model_versions:
     latest_version = max(model_versions, key=lambda x: x.version)
     
-    # Transition to staging (not production)
-    client.transition_model_version_stage(
-        name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}",
-        version=latest_version.version,
-        stage="Staging"
-    )
-    
-    print(f"Model version {latest_version.version} registered to Staging")
-    print(f"Model URI: {model_uri}")
-    print("Note: Use the model promotion workflow to promote to Production after validation")
+    # Set staging alias instead of transitioning stage
+    try:
+        client.set_registered_model_alias(
+            name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}",
+            alias="staging",
+            version=latest_version.version
+        )
+        
+        print(f"Model version {latest_version.version} registered to staging alias")
+        print(f"Model URI: {model_uri}")
+        print("Note: Use the model promotion workflow to promote to production alias")
+        
+    except Exception as e:
+        print(f"Error setting staging alias: {e}")
+        print("Model registered but alias not set")
 else:
     print("No model versions found")
 
@@ -407,7 +387,7 @@ print(f"  Validation F1 Score: {val_f1:.4f}")
 print()
 print("ARTIFACTS:")
 print(f"  Model URI: {model_uri}")
-print(f"  Model Stage: Staging")
+print(f"  Model Alias: Staging")
 print(f"  Vectorizer: {vectorizer_path}")
 print(f"  Label Encoder: {encoder_path}")
 print(f"  Confusion Matrix: {confusion_matrix_path}")
@@ -427,7 +407,7 @@ print("="*80)
 # MAGIC The political party classifier has been successfully:
 # MAGIC - Trained using XGBoost (upgraded from Logistic Regression)
 # MAGIC - Evaluated on test and validation sets
-# MAGIC - Registered to Unity Catalog in Staging stage
+# MAGIC - Registered to Unity Catalog with staging alias
 # MAGIC - Validation metrics saved for promotion workflow
 # MAGIC 
-# MAGIC The XGBoost model is now in Staging and ready for promotion review! 
+# MAGIC The XGBoost model is now in staging alias and ready for promotion review! 
