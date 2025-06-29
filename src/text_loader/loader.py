@@ -7,7 +7,7 @@ from sklearn.preprocessing import LabelEncoder
 class DataLoader:
     def __init__(self, filepath="data/Tweets.csv"):
         self.filepath = filepath
-        self.load_data()
+        self.data = self.load_data()
         self.vectorizer = None
         self.encoder = None
 
@@ -16,14 +16,18 @@ class DataLoader:
         return pd.read_csv(self.filepath)
 
     @staticmethod
-    def remove_characters(text: str) -> str:
-        """Remove non-letters from a given string"""
-        remove_chars = string.punctuation
-        translator = str.maketrans('', '', remove_chars)
-        return text.translate(translator)
+    def remove_characters(text) -> str:
+        """Remove URLs, numbers, and non-letters from a given string"""
+        # Handle non-string input
+        if not isinstance(text, str):
+            return ""
+        # Remove URLs
+        text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+        # Remove all non-alphabetic characters (including numbers and punctuation)
+        text = re.sub(r'[^a-zA-Z]', '', text)
+        return text.strip()
 
-    def clean_text(self, text: str) -> str:
-        """Keep only retain words in a given string"""
+    def clean_text(self, text) -> str:
         text = self.remove_characters(text)
         return text.strip()
 

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "political-parties-tweet-classifier"
+version = "0.1.0"
+description = "A machine learning project to classify tweets by political party"
+authors = [
+    {name = "Shyam Kumar V N", email = "shyamkumar.vn@thoughtworks.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit",
+    "requests",
+    "fastapi==0.110.0",
+    "pydantic==2.6.4",
+    "pydantic_core==2.16.3",
+    "mlflow==2.11.1",
+    "uvicorn",
+    "xgboost",
+    "pytest",
+    "pandas",
+    "numpy",
+    "pytest-mock",
+    "setuptools",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock",
+    "black",
+    "flake8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"] 

@@ -8,8 +8,8 @@ install: venv
 venv: $(VENV_DIR)/bin/activate
 
 $(VENV_DIR)/bin/activate: requirements.txt
-	test -d $(VENV_DIR) || $(PYTHON) -m venv $(VENV_DIR)
-	$(ACTIVATE_VENV); pip install -Ur requirements.txt
+	uv venv
+	uv pip install -r requirements.txt
 	touch $(VENV_DIR)/bin/activate
 
 test:

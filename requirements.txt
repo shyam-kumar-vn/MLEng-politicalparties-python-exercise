@@ -10,3 +10,5 @@ pytest
 pandas
 numpy
 pytest-mock
+setuptools
+scikit-learn

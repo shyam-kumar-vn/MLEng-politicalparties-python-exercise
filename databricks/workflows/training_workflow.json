@@ -1,0 +1,109 @@
+{
+  "name": "mle_shyamkumar_vn_training_workflow",
+  "email_notifications": {
+    "on_start": ["shyamkumar.vn@thoughtworks.com"],
+    "on_success": ["shyamkumar.vn@thoughtworks.com"],
+    "on_failure": ["shyamkumar.vn@thoughtworks.com"]
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "data_preparation",
+      "description": "Prepare and validate training data",
+      "depends_on": [],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/data_preparation",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "table_name": "tweets_data"
+        }
+      },
+      "timeout_seconds": 3600,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "feature_engineering",
+      "description": "Extract features from tweets and save to Delta table",
+      "depends_on": [
+        {
+          "task_key": "data_preparation"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/feature_engineering",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "input_table": "tweets_data",
+          "features_table": "tweet_features"
+        }
+      },
+      "timeout_seconds": 3600,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "model_training",
+      "description": "Train the political party classification model",
+      "depends_on": [
+        {
+          "task_key": "feature_engineering"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/train_model",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "model_name": "political_party_classifier",
+          "experiment_name": "/Shared/mle_shyamkumar_vn_tweet_classification"
+        }
+      },
+      "timeout_seconds": 7200,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "model_evaluation",
+      "description": "Evaluate model performance and generate reports",
+      "depends_on": [
+        {
+          "task_key": "model_training"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/model_evaluation",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "model_name": "political_party_classifier"
+        }
+      },
+      "timeout_seconds": 1800,
+      "retry_on_timeout": false
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": "{{cluster_id}}",
+      "cluster_name": "mle_shyamkumar_vn_training_cluster",
+      "spark_version": "13.3.x-scala2.12",
+      "node_type_id": "Standard_DS3_v2",
+      "num_workers": 2,
+      "autoscale": {
+        "min_workers": 1,
+        "max_workers": 4
+      },
+      "spark_conf": {
+        "spark.databricks.delta.preview.enabled": "true",
+        "spark.databricks.mlflow.trackMLflowDatasets": "true"
+      },
+      "aws_attributes": {
+        "availability": "SPOT_WITH_FALLBACK"
+      }
+    }
+  ]
+} 
