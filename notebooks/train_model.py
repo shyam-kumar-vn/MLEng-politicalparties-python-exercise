@@ -59,29 +59,44 @@ print_parameters(params)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Data Loading and Preprocessing Using DataLoader
+# MAGIC ## Data Loading and Preprocessing
 
 # COMMAND ----------
 
-# DBTITLE 1,Load data from Delta table using DataLoader
-# Load data from Delta table
-features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
-df = spark.read.table(features_table)
+# DBTITLE 1,Load and preprocess data using DataLoader
+# Initialize DataLoader and load data
+loader = DataLoader()
+csv_path = f"{DBFS_BASE_PATH}/Tweets.csv"
+loader.load_data(filepath=csv_path)
 
-# Convert to pandas
-data = df.toPandas()
+# Get preprocessed features and labels
+X = loader.preprocess_tweets()
+y = loader.preprocess_parties()
 
-print(f"Loaded {len(data)} samples from {features_table}")
+print(f"Feature matrix shape: {X.shape}")
+print(f"Label distribution: {np.bincount(y)}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Prepare features and labels using split column
-# Extract feature columns
+# DBTITLE 1,Load features from Delta table for train/test/validation split
+# Load features from Delta table (created in data_preparation notebook)
+features_table_name = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
+data = spark.read.table(features_table_name).toPandas()
+
+print(f"Loaded {len(data)} samples from features table")
+
+# Get feature columns (all columns that start with 'feature_')
 feature_columns = [col for col in data.columns if col.startswith('feature_')]
+print(f"Found {len(feature_columns)} feature columns")
 
-# Split data using the split column from data preparation
+# Split data based on the 'split' column
 train_data = data[data['split'] == 'train']
+validation_data = data[data['split'] == 'validation']
 test_data = data[data['split'] == 'test']
+
+print(f"Train samples: {len(train_data)}")
+print(f"Validation samples: {len(validation_data)}")
+print(f"Test samples: {len(test_data)}")
 
 # Prepare training data
 X_train = train_data[feature_columns].values
@@ -91,59 +106,73 @@ y_train = train_data['party_encoded'].values
 X_test = test_data[feature_columns].values
 y_test = test_data['party_encoded'].values
 
-print(f"Training set size: {X_train.shape[0]}")
-print(f"Test set size: {X_test.shape[0]}")
-print(f"Feature matrix shape: {X_train.shape[1]}")
-print(f"Training label distribution: {np.bincount(y_train)}")
-print(f"Test label distribution: {np.bincount(y_test)}")
-
-# Store full feature matrix for logging
-X = data[feature_columns].values
-y = data['party_encoded'].values
+print(f"Training set shape: {X_train.shape}")
+print(f"Test set shape: {X_test.shape}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Model Training and Registration with MLflow and Unity Catalog
+# MAGIC ## Model Training
 
 # COMMAND ----------
 
-# DBTITLE 1,Train model and register to Unity Catalog
-# Create run name with model type and timestamp
-run_name = f"logistic_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+# DBTITLE 1,Train the model
+# Train the model using our train_model function
+clf, metrics = train_model(X_train, y_train, X_test, y_test)
 
-with mlflow.start_run(run_name=run_name):
-    # Set tags for documentation
-    mlflow.set_tag("model_type", "LogisticRegression")
-    mlflow.set_tag("task", "political_party_classification")
-    mlflow.set_tag("data_source", "tweet_features")
-    mlflow.set_tag("catalog", CATALOG_NAME)
-    mlflow.set_tag("schema", SCHEMA_NAME)
-    mlflow.set_tag("training_timestamp", datetime.now().isoformat())
+print("Training completed!")
+print(f"Test Accuracy: {metrics['accuracy']:.4f}")
+print(f"Test Precision: {metrics['precision']:.4f}")
+print(f"Test Recall: {metrics['recall']:.4f}")
+print(f"Test F1 Score: {metrics['f1_score']:.4f}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Save Preprocessing Components
+
+# COMMAND ----------
+
+# DBTITLE 1,Save vectorizer and label encoder for model deployment
+import pickle
+
+# Save the vectorizer
+vectorizer_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_tfidf_vectorizer.pkl"
+with open(vectorizer_path, 'wb') as f:
+    pickle.dump(loader.vectorizer, f)
+print(f"Vectorizer saved to: {vectorizer_path}")
+
+# Save the label encoder
+encoder_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_label_encoder.pkl"
+with open(encoder_path, 'wb') as f:
+    pickle.dump(loader.encoder, f)
+print(f"Label encoder saved to: {encoder_path}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Model Registration with MLflow
+
+# COMMAND ----------
+
+# DBTITLE 1,Register model to Unity Catalog
+# Start MLflow run for model registration
+with mlflow.start_run(run_name="political_party_classifier_training") as run:
     
     # Log parameters
     mlflow.log_param("model_type", "LogisticRegression")
     mlflow.log_param("max_iter", 1000)
-    mlflow.log_param("max_features", X.shape[1])
-    mlflow.log_param("data_split_method", "stratified_split_column")
-    mlflow.log_param("train_split_ratio", 0.7)
-    mlflow.log_param("test_split_ratio", 0.2)
-    mlflow.log_param("validation_split_ratio", 0.1)
     mlflow.log_param("random_state", 42)
+    mlflow.log_param("training_samples", X_train.shape[0])
+    mlflow.log_param("test_samples", X_test.shape[0])
+    mlflow.log_param("feature_count", X_train.shape[1])
+    mlflow.log_param("class_count", len(np.unique(y_train)))
     
-    # Train model using our train_model function
-    print("Training model using our train_model function...")
-    clf, metrics = train_model(X_train, y_train, X_test, y_test)
-    
-    print("Model training completed!")
-    print(f"Model type: {type(clf).__name__}")
-    print(f"Accuracy: {metrics['accuracy']:.4f}")
-    
-    # Log metrics from our train_model function
-    mlflow.log_metric("accuracy", metrics['accuracy'])
-    mlflow.log_metric("precision", metrics['precision'])
-    mlflow.log_metric("recall", metrics['recall'])
-    mlflow.log_metric("f1_score", metrics['f1_score'])
+    # Log metrics
+    mlflow.log_metric("test_accuracy", metrics['accuracy'])
+    mlflow.log_metric("test_precision", metrics['precision'])
+    mlflow.log_metric("test_recall", metrics['recall'])
+    mlflow.log_metric("test_f1_score", metrics['f1_score'])
     
     # Log confusion matrix as artifact
     import matplotlib.pyplot as plt
@@ -152,20 +181,36 @@ with mlflow.start_run(run_name=run_name):
     cm = metrics['confusion_matrix']
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix')
+    plt.title('Confusion Matrix - Test Set')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
-    plt.savefig('/tmp/confusion_matrix.png')
-    mlflow.log_artifact('/tmp/confusion_matrix.png')
     
-    # Create a custom model with preprocessing components
+    confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix.png"
+    plt.savefig(confusion_matrix_path, dpi=300, bbox_inches='tight')
+    mlflow.log_artifact(confusion_matrix_path)
+    plt.close()
+    
+    # Create a custom model with embedded preprocessing components
     class PoliticalPartyClassifier(mlflow.pyfunc.PythonModel):
-        def __init__(self, model, vectorizer, label_encoder, data_loader=None):
+        def __init__(self, model, vectorizer, label_encoder):
             self.model = model
             self.vectorizer = vectorizer
             self.label_encoder = label_encoder
-            # Allow injection of a mock or custom DataLoader for testing
-            self.data_loader = data_loader or DataLoader()
+        
+        @staticmethod
+        def clean_text(text):
+            """Embedded text cleaning function to avoid import issues"""
+            import re
+            
+            # Handle non-string input
+            if not isinstance(text, str):
+                return ""
+            
+            # Remove URLs
+            text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+            # Remove all non-alphabetic characters (including numbers and punctuation)
+            text = re.sub(r'[^a-zA-Z]', '', text)
+            return text.strip()
         
         def predict(self, context, model_input):
             # Handle different input formats
@@ -186,8 +231,8 @@ with mlflow.start_run(run_name=run_name):
             else:
                 text_column = model_input.iloc[:, 0]
             
-            # Clean text using DataLoader's clean_text method
-            cleaned_text = text_column.apply(self.data_loader.clean_text)
+            # Clean text using embedded clean_text method
+            cleaned_text = text_column.apply(self.clean_text)
             
             # Vectorize
             X = self.vectorizer.transform(cleaned_text)
@@ -255,25 +300,47 @@ with mlflow.start_run(run_name=run_name):
     mlflow.log_metric("validation_recall", val_recall)
     mlflow.log_metric("validation_f1_score", val_f1)
     
-    print(f"Validation set size: {X_val.shape[0]}")
-    print(f"Validation Accuracy: {val_accuracy:.4f}")
-    print(f"Validation F1 Score: {val_f1:.4f}")
+    # Add tags for better organization
+    mlflow.set_tag("model_type", "political_party_classifier")
+    mlflow.set_tag("framework", "scikit-learn")
+    mlflow.set_tag("task", "text_classification")
+    mlflow.set_tag("author", "mle_shyamkumar_vn")
+    mlflow.set_tag("version", "1.0.0")
     
-    # Store validation metrics for model promotion decision
-    validation_metrics = {
-        'accuracy': val_accuracy,
-        'precision': val_precision,
-        'recall': val_recall,
-        'f1_score': val_f1
-    }
+    print("Validation metrics:")
+    print(f"  Accuracy: {val_accuracy:.4f}")
+    print(f"  Precision: {val_precision:.4f}")
+    print(f"  Recall: {val_recall:.4f}")
+    print(f"  F1 Score: {val_f1:.4f}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Model Promotion to Production
+
+# COMMAND ----------
+
+# DBTITLE 1,Promote model to production alias
+# Get the latest model version
+client = mlflow.tracking.MlflowClient()
+model_versions = client.search_model_versions(
+    f"name='{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}'"
+)
+
+if model_versions:
+    latest_version = max(model_versions, key=lambda x: x.version)
     
-    # Save validation metrics to file for model promotion workflow
-    import json
-    validation_metrics_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_validation_metrics.json"
-    with open(validation_metrics_path, 'w') as f:
-        json.dump(validation_metrics, f, indent=2)
+    # Transition to production
+    client.transition_model_version_stage(
+        name=f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}",
+        version=latest_version.version,
+        stage="Production"
+    )
     
-    print(f"Validation metrics saved to: {validation_metrics_path}")
+    print(f"Model version {latest_version.version} promoted to Production")
+    print(f"Model URI: {model_uri}")
+else:
+    print("No model versions found")
 
 # COMMAND ----------
 
@@ -283,37 +350,48 @@ with mlflow.start_run(run_name=run_name):
 # COMMAND ----------
 
 # DBTITLE 1,Display training summary
-print("=" * 60)
-print("MODEL TRAINING SUMMARY")
-print("=" * 60)
-print(f"Model: {MODEL_NAME}")
-print(f"Catalog: {CATALOG_NAME}.{SCHEMA_NAME}")
-print(f"Training samples: {X_train.shape[0]}")
-print(f"Test samples: {X_test.shape[1]}")
-print(f"Features: {X.shape[1]}")
+print("="*80)
+print("POLITICAL PARTY CLASSIFIER TRAINING SUMMARY")
+print("="*80)
+print(f"Model: {CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}")
+print(f"Experiment: {EXPERIMENT_NAME}")
+print(f"Run ID: {run.info.run_id}")
 print()
-print("PERFORMANCE METRICS:")
-print(f"  Accuracy:  {metrics['accuracy']:.4f}")
-print(f"  Precision: {metrics['precision']:.4f}")
-print(f"  Recall:    {metrics['recall']:.4f}")
-print(f"  F1 Score:  {metrics['f1_score']:.4f}")
+print("DATASET:")
+print(f"  Training samples: {X_train.shape[0]}")
+print(f"  Validation samples: {len(validation_data)}")
+print(f"  Test samples: {X_test.shape[0]}")
+print(f"  Features: {X_train.shape[1]}")
+print(f"  Classes: {len(np.unique(y_train))}")
 print()
-print("COMPONENTS USED:")
-print(f"  DataLoader: {type(DataLoader()).__name__}")
-print(f"  train_model function: {train_model.__name__}")
-print(f"  Model: {type(clf).__name__}")
-print(f"  Vectorizer: {type(vectorizer).__name__}")
-print(f"  Label Encoder: {type(label_encoder).__name__}")
-print("=" * 60)
+print("PERFORMANCE:")
+print(f"  Test Accuracy: {metrics['accuracy']:.4f}")
+print(f"  Test Precision: {metrics['precision']:.4f}")
+print(f"  Test Recall: {metrics['recall']:.4f}")
+print(f"  Test F1 Score: {metrics['f1_score']:.4f}")
+print()
+print("VALIDATION:")
+print(f"  Validation Accuracy: {val_accuracy:.4f}")
+print(f"  Validation Precision: {val_precision:.4f}")
+print(f"  Validation Recall: {val_recall:.4f}")
+print(f"  Validation F1 Score: {val_f1:.4f}")
+print()
+print("ARTIFACTS:")
+print(f"  Model URI: {model_uri}")
+print(f"  Vectorizer: {vectorizer_path}")
+print(f"  Label Encoder: {encoder_path}")
+print(f"  Confusion Matrix: {confusion_matrix_path}")
+print("="*80)
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Training Complete!
 # MAGIC 
-# MAGIC The model has been successfully:
-# MAGIC - Loaded and preprocessed using DataLoader
-# MAGIC - Trained using our train_model function
-# MAGIC - Evaluated with comprehensive metrics
+# MAGIC The political party classifier has been successfully:
+# MAGIC - Trained on the tweet dataset
+# MAGIC - Evaluated on test and validation sets
 # MAGIC - Registered to Unity Catalog
-# MAGIC - Ready for inference 
+# MAGIC - Promoted to production
+# MAGIC 
+# MAGIC The model is now ready for deployment and inference! 

@@ -1,0 +1,11 @@
+{
+  "catalog_name": "mle_batch_catalog_2025_q2",
+  "schema_name": "mle_shyamkumar_vn",
+  "model_name": "political_party_classifier",
+  "endpoint_name": "political-party-classifier-endpoint",
+  "production_alias": "production",
+  "workload_size": "Small",
+  "scale_to_zero": true,
+  "timeout_minutes": 10,
+  "description": "Political Party Classification Model Inference Endpoint"
+} 

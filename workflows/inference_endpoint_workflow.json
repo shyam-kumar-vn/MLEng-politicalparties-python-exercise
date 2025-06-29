@@ -1,0 +1,89 @@
+{
+  "name": "mle_shyamkumar_vn_inference_endpoint_workflow",
+  "email_notifications": {
+    "on_start": ["shyamkumar.vn@thoughtworks.com"],
+    "on_success": ["shyamkumar.vn@thoughtworks.com"],
+    "on_failure": ["shyamkumar.vn@thoughtworks.com"]
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "deploy_inference_endpoint",
+      "description": "Deploy the model inference endpoint using Databricks serving endpoints",
+      "depends_on": [],
+      "existing_cluster_id": "{{cluster_id}}",
+      "python_task": {
+        "python_file": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/src/deploy_inference_endpoint.py",
+        "parameters": [
+          "--catalog-name", "mle_batch_catalog_2025_q2",
+          "--schema-name", "mle_shyamkumar_vn",
+          "--model-name", "political_party_classifier",
+          "--production-alias", "production",
+          "--endpoint-name", "political-party-classifier-endpoint"
+        ]
+      },
+      "timeout_seconds": 1800,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "test_inference_endpoint",
+      "description": "Test the deployed inference endpoint functionality",
+      "depends_on": [
+        {
+          "task_key": "deploy_inference_endpoint"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "python_task": {
+        "python_file": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/src/test_inference_endpoint.py",
+        "parameters": [
+          "--endpoint-url", "{{endpoint_url}}",
+          "--test-mode", "remote"
+        ]
+      },
+      "timeout_seconds": 900,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "endpoint_monitoring_setup",
+      "description": "Set up monitoring and alerting for the inference endpoint",
+      "depends_on": [
+        {
+          "task_key": "test_inference_endpoint"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/endpoint_monitoring",
+        "base_parameters": {
+          "endpoint_name": "political-party-classifier-endpoint",
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "model_name": "political_party_classifier"
+        }
+      },
+      "timeout_seconds": 600,
+      "retry_on_timeout": false
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": "{{cluster_id}}",
+      "cluster_name": "mle_shyamkumar_vn_inference_cluster",
+      "spark_version": "13.3.x-scala2.12",
+      "node_type_id": "Standard_DS3_v2",
+      "num_workers": 1,
+      "autoscale": {
+        "min_workers": 1,
+        "max_workers": 2
+      },
+      "spark_conf": {
+        "spark.databricks.delta.preview.enabled": "true",
+        "spark.databricks.mlflow.trackMLflowDatasets": "true"
+      },
+      "aws_attributes": {
+        "availability": "SPOT_WITH_FALLBACK"
+      }
+    }
+  ]
+} 
