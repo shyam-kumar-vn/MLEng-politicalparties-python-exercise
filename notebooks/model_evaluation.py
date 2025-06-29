@@ -100,7 +100,7 @@ features_table = get_table_name(CATALOG_NAME, SCHEMA_NAME, "tweet_features")
 df = spark.read.table(features_table)
 
 # Filter for test data only using the split column
-test_df = df.filter(df.split == "test")
+test_df = df.filter(df["split"] == "test")
 
 # Convert to pandas for evaluation
 test_data = test_df.toPandas()

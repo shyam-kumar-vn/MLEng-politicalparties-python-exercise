@@ -13,6 +13,12 @@
 # MAGIC %md
 # MAGIC ## Setup and Configuration
 
+
+# COMMAND ----------
+# DBTITLE 1,Install xgboost
+
+!pip install -U xgboost
+
 # COMMAND ----------
 
 # DBTITLE 1,Import required libraries and components
