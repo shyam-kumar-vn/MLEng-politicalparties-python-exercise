@@ -119,7 +119,7 @@ except Exception as e:
 # DBTITLE 1,Evaluate current production model on validation set
 if current_production_version is not None:
     # Load current production model
-    current_model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, str(current_production_version))
+    current_model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, version=str(current_production_version))
     current_model = mlflow.pyfunc.load_model(current_model_uri)
     
     print(f"Loaded current production model from: {current_model_uri}")

@@ -172,9 +172,13 @@ class BatchInferenceEngine:
         """Perform inference using registered model directly"""
         logger.info("Using registered model directly")
         
-        # Load model from Unity Catalog
-        model_uri = get_model_uri(self.config['catalog_name'], self.config['schema_name'], 
-                                 self.config['model_name'], self.config['production_alias'])
+        # Load model from Unity Catalog using alias
+        model_uri = get_model_uri(
+            self.config['catalog_name'], 
+            self.config['schema_name'], 
+            self.config['model_name'], 
+            alias=self.config['production_alias']
+        )
         
         model = mlflow.pyfunc.load_model(model_uri)
         logger.info(f"Model loaded from: {model_uri}")

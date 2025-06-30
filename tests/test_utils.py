@@ -19,8 +19,12 @@ def test_get_model_uri():
     assert model_uri == "models:/catalog.schema.model"
     
     # Test with custom version
-    model_uri_v1 = get_model_uri("catalog", "schema", "model", "1")
+    model_uri_v1 = get_model_uri("catalog", "schema", "model", version="1")
     assert model_uri_v1 == "models:/catalog.schema.model/1"
+    
+    # Test with alias (preferred for Unity Catalog)
+    model_uri_alias = get_model_uri("catalog", "schema", "model", alias="production")
+    assert model_uri_alias == "models:/catalog.schema.model@production"
 
 
 def test_print_parameters(capsys):

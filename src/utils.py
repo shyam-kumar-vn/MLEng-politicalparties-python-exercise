@@ -108,7 +108,7 @@ def get_table_name(catalog_name, schema_name, table_name):
     return f"{catalog_name}.{schema_name}.{table_name}"
 
 
-def get_model_uri(catalog_name, schema_name, model_name, version=None):
+def get_model_uri(catalog_name, schema_name, model_name, version=None, alias=None):
     """
     Generate a model URI for Unity Catalog.
     
@@ -116,15 +116,23 @@ def get_model_uri(catalog_name, schema_name, model_name, version=None):
         catalog_name (str): Catalog name
         schema_name (str): Schema name
         model_name (str): Model name
-        version (str, optional): Model version. If None, uses the model name without version.
+        version (str, optional): Model version number. If provided, uses /version syntax.
+        alias (str, optional): Model alias. If provided, uses @alias syntax (preferred for Unity Catalog).
         
     Returns:
         str: Model URI
     """
-    if version:
-        return f"models:/{catalog_name}.{schema_name}.{model_name}/{version}"
+    model_name_full = f"{catalog_name}.{schema_name}.{model_name}"
+    
+    if alias:
+        # Use alias syntax for Unity Catalog (preferred)
+        return f"models:/{model_name_full}@{alias}"
+    elif version:
+        # Use version syntax (legacy)
+        return f"models:/{model_name_full}/{version}"
     else:
-        return f"models:/{catalog_name}.{schema_name}.{model_name}"
+        # No version or alias specified
+        return f"models:/{model_name_full}"
 
 
 def create_text_classification_signature():

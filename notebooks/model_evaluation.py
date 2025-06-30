@@ -83,7 +83,7 @@ except Exception as e:
         print(f"Using latest version as fallback: {version_number}")
         
         # Load the model with specific version
-        model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, str(version_number))
+        model_uri = get_model_uri(CATALOG_NAME, SCHEMA_NAME, MODEL_NAME, version=str(version_number))
         loaded_model = mlflow.pyfunc.load_model(model_uri)
         
         print(f"Model loaded from: {model_uri}")
