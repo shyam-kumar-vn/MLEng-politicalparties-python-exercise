@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # Batch Inference Workflow
 # MAGIC 
-# MAGIC This notebook implements batch inference for the Political Party Classification model (XGBoost):
+# MAGIC This notebook implements batch inference for the Political Party Classification model (Logistic Regression):
 # MAGIC 1. Load data for inference (same data used for training)
 # MAGIC 2. Choose inference method: Serving Endpoint OR Direct Model
 # MAGIC 3. Perform batch predictions

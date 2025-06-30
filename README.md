@@ -6,14 +6,14 @@ This repository contains the necessary setup and code base to help guide you in 
 
 ## 🚀 **Latest Updates**
 
-- **Model Upgrade**: Upgraded from Logistic Regression to **XGBoost** for improved performance
-- **Enhanced Accuracy**: Better classification results with gradient boosting
+- **Model**: Using **Logistic Regression** for political party classification
 - **Production Ready**: Full ML pipeline with training, deployment, and batch inference workflows
+- **Enhanced Pipeline**: Complete workflow with model promotion and evaluation
 
 ## 🏗️ **Architecture Overview**
 
 The project implements a complete ML pipeline using:
-- **XGBoost** for model training and inference
+- **Logistic Regression** for model training and inference
 - **Databricks Unity Catalog** for model management
 - **MLflow** for experiment tracking and model versioning
 - **Delta Lake** for feature storage

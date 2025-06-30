@@ -5,7 +5,7 @@
 # MAGIC This notebook implements the batch training workflow using our existing components:
 # MAGIC 1. Data Loading and Preprocessing using DataLoader
 # MAGIC 2. Feature Engineering using DataLoader
-# MAGIC 3. Model Training using XGBoost (updated from Logistic Regression)
+# MAGIC 3. Model Training using Logistic Regression (updated from XGBoost)
 # MAGIC 4. Model Registration to Unity Catalog
 
 # COMMAND ----------
@@ -15,22 +15,14 @@
 
 
 # COMMAND ----------
-# DBTITLE 1,Install xgboost
-
-!pip install -U xgboost
-
-# COMMAND ----------
-
 # DBTITLE 1,Import required libraries and components
 import os
 import mlflow
 import mlflow.sklearn
-import mlflow.xgboost
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from datetime import datetime
-import xgboost as xgb
 import json
 
 from src.text_loader.loader import DataLoader
@@ -125,23 +117,21 @@ print(f"Test set shape: {X_test.shape}")
 
 # COMMAND ----------
 
-# DBTITLE 1,Train and register model with XGBoost (Atomic MLflow Run)
+# DBTITLE 1,Train and register model with Logistic Regression (Atomic MLflow Run)
 # Start MLflow run for atomic training and registration
-with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as run:
+with mlflow.start_run(run_name="political_party_classifier_logistic_regression_training") as run:
     
     # Log parameters
-    mlflow.log_param("model_type", "XGBoost")
-    mlflow.log_param("n_estimators", 100)
-    mlflow.log_param("max_depth", 6)
-    mlflow.log_param("learning_rate", 0.1)
+    mlflow.log_param("model_type", "LogisticRegression")
+    mlflow.log_param("max_iter", 1000)
     mlflow.log_param("random_state", 42)
     mlflow.log_param("training_samples", X_train.shape[0])
     mlflow.log_param("test_samples", X_test.shape[0])
     mlflow.log_param("feature_count", X_train.shape[1])
     mlflow.log_param("class_count", len(np.unique(y_train)))
     
-    # Train the model using our train_model function with XGBoost
-    clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="XGBoost")
+    # Train the model using our train_model function with Logistic Regression
+    clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="LogisticRegression")
     
     print("Training completed!")
     print(f"Model type: {type(clf).__name__}")
@@ -178,11 +168,11 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
     cm = metrics['confusion_matrix']
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title('Confusion Matrix - Test Set (XGBoost)')
+    plt.title('Confusion Matrix - Test Set (Logistic Regression)')
     plt.ylabel('True Label')
     plt.xlabel('Predicted Label')
     
-    confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix_xgboost.png"
+    confusion_matrix_path = f"{DBFS_BASE_PATH}/{SCHEMA_NAME}_confusion_matrix_logistic_regression.png"
     plt.savefig(confusion_matrix_path, dpi=300, bbox_inches='tight')
     mlflow.log_artifact(confusion_matrix_path)
     plt.close()
@@ -304,7 +294,7 @@ with mlflow.start_run(run_name="political_party_classifier_xgboost_training") as
     
     # Add tags for better organization
     mlflow.set_tag("model_type", "political_party_classifier")
-    mlflow.set_tag("framework", "xgboost")
+    mlflow.set_tag("framework", "logistic_regression")
     mlflow.set_tag("task", "text_classification")
     mlflow.set_tag("author", "mle_shyamkumar_vn")
     mlflow.set_tag("version", "2.0.0")
@@ -360,7 +350,7 @@ else:
 
 # DBTITLE 1,Display training summary
 print("="*80)
-print("POLITICAL PARTY CLASSIFIER TRAINING SUMMARY (XGBoost)")
+print("POLITICAL PARTY CLASSIFIER TRAINING SUMMARY (Logistic Regression)")
 print("="*80)
 print(f"Model: {CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}")
 print(f"Experiment: {EXPERIMENT_NAME}")
@@ -373,11 +363,9 @@ print(f"  Test samples: {X_test.shape[0]}")
 print(f"  Features: {X_train.shape[1]}")
 print(f"  Classes: {len(np.unique(y_train))}")
 print()
-print("XGBOOST PARAMETERS:")
-print(f"  n_estimators: 100")
-print(f"  max_depth: 6")
-print(f"  learning_rate: 0.1")
-print(f"  eval_metric: logloss")
+print("LOGISTIC REGRESSION PARAMETERS:")
+print(f"  max_iter: 1000")
+print(f"  random_state: 42")
 print()
 print("PERFORMANCE:")
 print(f"  Test Accuracy: {metrics['accuracy']:.4f}")
@@ -411,9 +399,9 @@ print("="*80)
 # MAGIC ## Training Complete!
 # MAGIC 
 # MAGIC The political party classifier has been successfully:
-# MAGIC - Trained using XGBoost (upgraded from Logistic Regression)
+# MAGIC - Trained using Logistic Regression
 # MAGIC - Evaluated on test and validation sets
 # MAGIC - Registered to Unity Catalog with staging alias
 # MAGIC - Validation metrics saved for promotion workflow
 # MAGIC 
-# MAGIC The XGBoost model is now in staging alias and ready for promotion review! 
+# MAGIC The Logistic Regression model is now in staging alias and ready for promotion review! 

@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import xgboost as xgb
 from src.text_loader.loader import DataLoader
 
-def train_model(X_train, y_train, X_test, y_test, model_type="XGBoost", max_iter=1000, random_state=42):
+def train_model(X_train, y_train, X_test, y_test, model_type="LogisticRegression", max_iter=1000, random_state=42):
     """
     Train a classification model and return the trained model and evaluation metrics.
     
@@ -17,7 +17,7 @@ def train_model(X_train, y_train, X_test, y_test, model_type="XGBoost", max_iter
         y_train: Training labels
         X_test: Test features
         y_test: Test labels
-        model_type: Type of model to train (default: XGBoost, options: XGBoost, LogisticRegression)
+        model_type: Type of model to train (default: LogisticRegression, options: XGBoost, LogisticRegression)
         max_iter: Maximum iterations for training (default: 1000, only used for LogisticRegression)
         random_state: Random state for reproducibility (default: 42)
     
@@ -63,23 +63,22 @@ def main():
     # 2. Train/Test Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    # 3. Train Model (now using XGBoost by default)
-    clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="XGBoost")
+    # 3. Train Model (now using LogisticRegression by default)
+    clf, metrics = train_model(X_train, y_train, X_test, y_test, model_type="LogisticRegression")
 
     # 4. MLflow Tracking
     mlflow.set_experiment("tweet_party_classification")
     with mlflow.start_run():
-        mlflow.log_param("model_type", "XGBoost")
-        mlflow.log_param("n_estimators", 100)
-        mlflow.log_param("max_depth", 6)
-        mlflow.log_param("learning_rate", 0.1)
+        mlflow.log_param("model_type", "LogisticRegression")
+        mlflow.log_param("max_iter", 1000)
+        mlflow.log_param("random_state", 42)
         mlflow.log_metric("accuracy", metrics['accuracy'])
         mlflow.log_metric("precision", metrics['precision'])
         mlflow.log_metric("recall", metrics['recall'])
         mlflow.log_metric("f1_score", metrics['f1_score'])
         
-        # Log XGBoost model
-        mlflow.xgboost.log_model(clf, "model")
+        # Log LogisticRegression model
+        mlflow.sklearn.log_model(clf, "model")
         
         # Optionally log confusion matrix as an artifact
         import numpy as np
