@@ -3,6 +3,29 @@ Common utilities for Databricks notebooks.
 """
 import mlflow
 mlflow.set_registry_uri("databricks-uc")
+def create_widget_if_not_exists(widget_name, widget_type="text", default_value=""):
+    """
+    Create a Databricks widget if it doesn't already exist.
+    
+    This is sometimes necessary in workflows to ensure parameters are accessible.
+    
+    Args:
+        widget_name (str): Name of the widget to create
+        widget_type (str): Type of widget ("text", "dropdown", "multiselect", "combobox")
+        default_value: Default value for the widget
+    """
+    try:
+        # Try to get the widget value - if it fails, the widget doesn't exist
+        dbutils.widgets.get(widget_name)
+    except:
+        # Widget doesn't exist, create it
+        try:
+            dbutils.widgets.text(widget_name, default_value)
+            print(f"Created widget '{widget_name}' with default value '{default_value}'")
+        except Exception as e:
+            print(f"Warning: Could not create widget '{widget_name}': {e}")
+
+
 def get_widget_value(widget_name, default_value):
     """
     Safely get widget value with fallback to default.
@@ -10,17 +33,32 @@ def get_widget_value(widget_name, default_value):
     This function handles cases where Databricks widgets are not defined
     when running notebooks directly vs. as part of a workflow.
     
+    In Databricks workflows, parameters are passed via base_parameters and
+    are accessible using dbutils.widgets.get() just like regular widgets.
+    
     Args:
-        widget_name (str): Name of the widget to retrieve
-        default_value: Default value to return if widget is not defined
+        widget_name (str): Name of the widget/parameter to retrieve
+        default_value: Default value to return if widget/parameter is not defined
         
     Returns:
-        The widget value if defined, otherwise the default value
+        The widget/parameter value if defined, otherwise the default value
     """
     try:
+        # First, try to create the widget if it doesn't exist (for workflow parameters)
+        create_widget_if_not_exists(widget_name, "text", str(default_value))
+        
+        # Try to get the value from widgets (works for both regular widgets and workflow parameters)
         value = dbutils.widgets.get(widget_name)
-        return value if value else default_value
-    except:
+        
+        # Return the value if it's not empty, otherwise return default
+        if value and value.strip() != "":
+            return value
+        else:
+            return default_value
+            
+    except Exception as e:
+        # If widget access fails (e.g., dbutils not available), return default
+        print(f"Warning: Could not access widget '{widget_name}': {e}")
         return default_value
 
 

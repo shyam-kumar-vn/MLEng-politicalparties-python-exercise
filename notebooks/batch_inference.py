@@ -324,8 +324,8 @@ spark_results_df.write.mode("overwrite").saveAsTable(inference_results_table_wit
 
 print(f"Inference results saved to: {inference_results_table_with_timestamp}")
 
-# Also save to a fixed table name for easy access
-spark_results_df.write.mode("overwrite").saveAsTable(inference_results_table)
+# Also save to a fixed table name for easy access - use append to accumulate results
+spark_results_df.write.mode("append").saveAsTable(inference_results_table)
 
 print(f"Inference results also saved to: {inference_results_table}")
 
