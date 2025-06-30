@@ -203,7 +203,7 @@ print(f"Confusion matrix saved to: {confusion_matrix_path}")
 # DBTITLE 1,Class-wise performance
 # Calculate per-class metrics
 from sklearn.metrics import precision_recall_fscore_support
-
+import pandas as pd
 precision_per_class, recall_per_class, f1_per_class, support_per_class = precision_recall_fscore_support(
     y_true, predictions, average=None, labels=np.unique(y_true)
 )
