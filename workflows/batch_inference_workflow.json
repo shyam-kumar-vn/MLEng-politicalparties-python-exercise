@@ -21,6 +21,7 @@
           "features_table": "tweet_features",
           "inference_method": "serving_endpoint",
           "endpoint_name": "political-party-classifier-endpoint",
+          "serving_endpoint_url": "{{serving_endpoint_url}}",
           "production_alias": "production",
           "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn",
           "batch_size": "100"

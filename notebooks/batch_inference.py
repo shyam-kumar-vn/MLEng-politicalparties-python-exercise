@@ -50,6 +50,7 @@ MODEL_NAME = get_widget_value("model_name", "political_party_classifier")
 FEATURES_TABLE = get_widget_value("features_table", "tweet_features")
 INFERENCE_METHOD = get_widget_value("inference_method", "serving_endpoint")  # "serving_endpoint" or "direct_model"
 ENDPOINT_NAME = get_widget_value("endpoint_name", "political-party-classifier-endpoint")
+SERVING_ENDPOINT_URL = get_widget_value("serving_endpoint_url", "")  # Full URL from workflow
 PRODUCTION_ALIAS = get_widget_value("production_alias", "production")
 DBFS_BASE_PATH = get_widget_value("dbfs_base_path", "/dbfs/FileStore/shyamkumar.vn")
 BATCH_SIZE = int(get_widget_value("batch_size", "100"))
@@ -62,6 +63,7 @@ params = {
     "Features Table": FEATURES_TABLE,
     "Inference Method": INFERENCE_METHOD,
     "Endpoint Name": ENDPOINT_NAME,
+    "Serving Endpoint URL": SERVING_ENDPOINT_URL if SERVING_ENDPOINT_URL else "Auto-generated",
     "Production Alias": PRODUCTION_ALIAS,
     "DBFS Base Path": DBFS_BASE_PATH,
     "Batch Size": BATCH_SIZE
@@ -118,9 +120,15 @@ class BatchInferenceEngine:
         """Perform inference using Databricks serving endpoint"""
         logger.info(f"Using serving endpoint: {self.config['endpoint_name']}")
         
-        # Get endpoint URL
-        workspace_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().extraContext().get("api_url")
-        endpoint_url = f"{workspace_url}/serving-endpoints/{self.config['endpoint_name']}/invocations"
+        # Use provided endpoint URL or generate one
+        if self.config.get('serving_endpoint_url'):
+            endpoint_url = self.config['serving_endpoint_url']
+            logger.info(f"Using provided endpoint URL: {endpoint_url}")
+        else:
+            # Fallback to auto-generated URL
+            workspace_url = dbutils.notebook.entry_point.getDbutils().notebook().getContext().extraContext().get("api_url")
+            endpoint_url = f"{workspace_url}/serving-endpoints/{self.config['endpoint_name']}/invocations"
+            logger.info(f"Using auto-generated endpoint URL: {endpoint_url}")
         
         # Get authentication token
         token = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
@@ -247,6 +255,7 @@ inference_config = {
     "model_name": MODEL_NAME,
     "production_alias": PRODUCTION_ALIAS,
     "endpoint_name": ENDPOINT_NAME,
+    "serving_endpoint_url": SERVING_ENDPOINT_URL,
     "batch_size": BATCH_SIZE
 }
 
@@ -254,6 +263,10 @@ inference_config = {
 inference_engine = BatchInferenceEngine(INFERENCE_METHOD, inference_config)
 
 print(f"Inference engine initialized with method: {INFERENCE_METHOD}")
+if SERVING_ENDPOINT_URL:
+    print(f"Using provided endpoint URL: {SERVING_ENDPOINT_URL}")
+else:
+    print(f"Using auto-generated endpoint URL for: {ENDPOINT_NAME}")
 
 # COMMAND ----------
 

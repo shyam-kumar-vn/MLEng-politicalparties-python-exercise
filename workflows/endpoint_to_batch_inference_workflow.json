@@ -1,0 +1,115 @@
+{
+  "name": "mle_shyamkumar_vn_endpoint_to_batch_inference_workflow",
+  "email_notifications": {
+    "on_start": ["shyamkumar.vn@thoughtworks.com"],
+    "on_success": ["shyamkumar.vn@thoughtworks.com"],
+    "on_failure": ["shyamkumar.vn@thoughtworks.com"]
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "deploy_inference_endpoint",
+      "description": "Deploy the model inference endpoint using Databricks serving endpoints",
+      "depends_on": [],
+      "existing_cluster_id": "{{cluster_id}}",
+      "python_task": {
+        "python_file": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/src/deploy_inference_endpoint.py",
+        "parameters": [
+          "--catalog-name", "mle_batch_catalog_2025_q2",
+          "--schema-name", "mle_shyamkumar_vn",
+          "--model-name", "political_party_classifier",
+          "--production-alias", "production",
+          "--endpoint-name", "political-party-classifier-endpoint"
+        ]
+      },
+      "timeout_seconds": 1800,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "extract_endpoint_url",
+      "description": "Extract endpoint URL from deployment output",
+      "depends_on": [
+        {
+          "task_key": "deploy_inference_endpoint"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/extract_endpoint_url",
+        "base_parameters": {
+          "deployment_output_file": "deployment_info.json",
+          "endpoint_name": "political-party-classifier-endpoint"
+        }
+      },
+      "timeout_seconds": 300,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "batch_inference_with_endpoint",
+      "description": "Perform batch inference using the deployed serving endpoint",
+      "depends_on": [
+        {
+          "task_key": "extract_endpoint_url"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/batch_inference",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "model_name": "political_party_classifier",
+          "features_table": "tweet_features",
+          "inference_method": "serving_endpoint",
+          "endpoint_name": "political-party-classifier-endpoint",
+          "serving_endpoint_url": "{{endpoint_url}}",
+          "production_alias": "production",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn",
+          "batch_size": "100"
+        }
+      },
+      "timeout_seconds": 3600,
+      "retry_on_timeout": false
+    },
+    {
+      "task_key": "inference_reporting",
+      "description": "Generate comprehensive inference reports and alerts",
+      "depends_on": [
+        {
+          "task_key": "batch_inference_with_endpoint"
+        }
+      ],
+      "existing_cluster_id": "{{cluster_id}}",
+      "notebook_task": {
+        "notebook_path": "/Repos/mle_shyamkumar_vn/political-parties-tweet-classifier/databricks/notebooks/inference_reporting",
+        "base_parameters": {
+          "catalog_name": "mle_batch_catalog_2025_q2",
+          "schema_name": "mle_shyamkumar_vn",
+          "dbfs_base_path": "/dbfs/FileStore/shyamkumar.vn"
+        }
+      },
+      "timeout_seconds": 1200,
+      "retry_on_timeout": false
+    }
+  ],
+  "clusters": [
+    {
+      "cluster_id": "{{cluster_id}}",
+      "cluster_name": "mle_shyamkumar_vn_endpoint_batch_cluster",
+      "spark_version": "13.3.x-scala2.12",
+      "node_type_id": "Standard_DS3_v2",
+      "num_workers": 2,
+      "autoscale": {
+        "min_workers": 1,
+        "max_workers": 4
+      },
+      "spark_conf": {
+        "spark.databricks.delta.preview.enabled": "true",
+        "spark.databricks.mlflow.trackMLflowDatasets": "true"
+      },
+      "aws_attributes": {
+        "availability": "SPOT_WITH_FALLBACK"
+      }
+    }
+  ]
+} 
