@@ -2,7 +2,13 @@
 Common utilities for Databricks notebooks.
 """
 import mlflow
+from pyspark.sql import SparkSession
+from pyspark.dbutils import DBUtils
+
 mlflow.set_registry_uri("databricks-uc")
+spark = SparkSession.builder.getOrCreate()
+dbutils = DBUtils(spark)
+
 def create_widget_if_not_exists(widget_name, widget_type="text", default_value=""):
     """
     Create a Databricks widget if it doesn't already exist.
@@ -15,8 +21,14 @@ def create_widget_if_not_exists(widget_name, widget_type="text", default_value="
         default_value: Default value for the widget
     """
     try:
+        # Check if dbutils is available by trying to access it
+        dbutils
+        
         # Try to get the widget value - if it fails, the widget doesn't exist
         dbutils.widgets.get(widget_name)
+    except NameError:
+        # dbutils not available, skip widget creation
+        return
     except:
         # Widget doesn't exist, create it
         try:
@@ -44,6 +56,9 @@ def get_widget_value(widget_name, default_value):
         The widget/parameter value if defined, otherwise the default value
     """
     try:
+        # Check if dbutils is available by trying to access it
+        dbutils
+        
         # First, try to create the widget if it doesn't exist (for workflow parameters)
         create_widget_if_not_exists(widget_name, "text", str(default_value))
         
@@ -56,8 +71,11 @@ def get_widget_value(widget_name, default_value):
         else:
             return default_value
             
+    except NameError:
+        # dbutils not available (running outside Databricks)
+        return default_value
     except Exception as e:
-        # If widget access fails (e.g., dbutils not available), return default
+        # If widget access fails for other reasons, return default
         print(f"Warning: Could not access widget '{widget_name}': {e}")
         return default_value
 
